@@ -5,6 +5,7 @@
 | Layer | Tool | Database | Scope |
 | --- | --- | --- | --- |
 | Unit | Vitest (`tests/unit`) | none (pure functions) | money utils, every ledger derivation, batch invariants |
+| Component | Vitest + React Testing Library (jsdom) | none | MoneyDisplay/MoneyInput formatting, quick amounts, badges, empty/error states, connectivity indicator |
 | Integration | Vitest (`tests/integration`) | `cashgame_test` (migrated + truncated per file) | service commands, transactions, rollback, authz, auth, exports |
 | E2E | Playwright (`e2e/`) | `cashgame_e2e` (migrated + truncated + seeded per run) | the 8 mandatory user scenarios in Hebrew, desktop + mobile viewports |
 
@@ -12,6 +13,7 @@ Run: `npm run test:unit` · `npm run test:integration` · `npm run build && npm 
 
 ## Unit coverage (tests/unit)
 
+- Components (React Testing Library): agorot reporting while typing with separators, non-numeric input safety, external value sync, numeric keyboard attribute, debt badge not-color-alone, retry actions.
 - Money: shekel↔agorot conversion, formatting, thousands separators, invalid input, negatives, overflow-safe sums.
 - Ledger math: spec examples A–D verbatim; multiple rebuys/payments; credit create/use; reversals excluded from balances; manual adjustments (sign/target); session totals; payment-method separation; expected cash (only CASH moves the drawer); partial cash-outs and rebuy-after-cash-out; buy-in and cash-out batch invariants (positive and negative cases).
 

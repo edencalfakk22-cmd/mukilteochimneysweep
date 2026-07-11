@@ -13,5 +13,5 @@ First production-ready release.
 - **Hebrew RTL UI** — live session dashboard (summary cards, player cards, instant search/sort/filter, bottom-sheet dialogs), add-player flow with debt preview, session close wizard, players/profile, debts screen, cash drawer, reports, settings + user management, audit log; PWA manifest + icons + safe service worker + connectivity guard.
 - **Reports** — session/player/debt reports; PDF via RTL HTML + headless Chromium (pdfkit rejected after empirical Hebrew bidi failures); RTL Excel via exceljs; CSV with BOM; print styles; immutable closing snapshots.
 - **Integrity tooling** — `verify-ledger` CLI recomputing every balance and invariant from the raw ledger.
-- **Tests** — 27 unit + 19 integration + 10 E2E (8 scenarios, desktop + mobile) all green; typecheck, lint and production build clean.
+- **Tests** — 44 unit/component + 19 integration + 10 E2E (8 scenarios, desktop + mobile) all green; typecheck, lint and production build clean.
 - **Ops** — Dockerfile (standalone output + Chromium + Hebrew fonts), docker-compose (app+db), dev compose, one-command start scripts (sh/ps1/bat), timestamped backup/restore scripts, full documentation set.

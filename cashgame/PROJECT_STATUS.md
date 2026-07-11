@@ -7,6 +7,8 @@ Last updated: 2026-07-11 (v1.0.0)
 - [x] Project foundation: Next.js 16 + TS strict + Tailwind v4; Prisma 6 schema (13 entities) + initial migration on PostgreSQL 16
 - [x] Money core: integer-agorot utilities, zero floating point
 - [x] Pure ledger derivations (`src/lib/ledger-math.ts`) — player/session stats, debt splits (session vs. historical), expected cash, batch invariants
+- [x] Component tests (React Testing Library): MoneyDisplay/MoneyInput/badges/states/ConnectionIndicator
+- [x] Unsaved-form browser-navigation guard on financial dialogs (UX rule 35.20)
 - [x] Ledger commands: buy-in/rebuy, payments (allocation strategies), cash-outs (debt-first / pay-full / manual split), drawer ops, adjustments, batch reversals — all in serializable transactions with idempotency keys and in-transaction balance recompute
 - [x] Auth & security: bcrypt, DB sessions, rate-limited login, PIN unlock + idle auto-lock, server-side RBAC, inline manager approvals, CSRF origin check, security headers, audit log
 - [x] Hebrew RTL UI: dashboard, sessions list/new, live session dashboard (cards+dialogs), close wizard, players + profile, debts screen, cash drawer, reports, settings + users, audit log, login/locked screens
@@ -23,7 +25,7 @@ Last updated: 2026-07-11 (v1.0.0)
 
 | Suite | Status |
 | --- | --- |
-| Unit (27 tests) | ✅ pass |
+| Unit + component (44 tests, incl. React Testing Library) | ✅ pass |
 | Integration (19 tests) | ✅ pass |
 | E2E (10 tests: 8 scenarios, desktop + mobile) | ✅ pass |
 | `tsc --noEmit` | ✅ clean |

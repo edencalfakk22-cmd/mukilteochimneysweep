@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input, Label, Select } from "@/components/ui/input";
 import { MoneyDisplay, MoneyInput, QuickAmountButtons } from "@/components/money";
 import { ManagerApprovalFields, SummaryRow, type ApprovalValue } from "@/components/session/approval";
+import { useUnsavedGuard } from "@/lib/use-unsaved-guard";
 import { paymentMethodLabels, payableMethods } from "@/lib/labels";
 import type { SessionPlayerDto, SessionSettingsDto } from "@/components/session/types";
 import type { PaymentMethod } from "@prisma/client";
@@ -46,6 +47,7 @@ export function BuyInDialog({
   const idemKey = React.useRef(newIdempotencyKey());
 
   // Fresh state per open: the parent remounts this dialog with a changing key.
+  useUnsavedGuard(open && chipAmount != null && !saving);
 
   if (!player) return null;
 

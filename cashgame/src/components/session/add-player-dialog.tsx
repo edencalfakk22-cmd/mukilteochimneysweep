@@ -11,6 +11,7 @@ import { Input, Label, Select } from "@/components/ui/input";
 import { MoneyDisplay, MoneyInput, QuickAmountButtons } from "@/components/money";
 import { DebtBadge } from "@/components/domain-badges";
 import { SummaryRow } from "@/components/session/approval";
+import { useUnsavedGuard } from "@/lib/use-unsaved-guard";
 import { paymentMethodLabels, payableMethods } from "@/lib/labels";
 import type { SessionPlayerDto, SessionSettingsDto } from "@/components/session/types";
 import type { PaymentMethod } from "@prisma/client";
@@ -68,6 +69,7 @@ export function AddPlayerDialog({
   );
 
   // Fresh state per open: the parent remounts this dialog with a changing key.
+  useUnsavedGuard(open && (chipAmount != null || createMode) && !saving);
 
   // Instant search with a short debounce.
   React.useEffect(() => {

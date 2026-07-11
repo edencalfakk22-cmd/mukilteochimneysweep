@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input, Label, Select } from "@/components/ui/input";
 import { MoneyDisplay, MoneyInput } from "@/components/money";
 import { SummaryRow } from "@/components/session/approval";
+import { useUnsavedGuard } from "@/lib/use-unsaved-guard";
 import { paymentMethodLabels, payableMethods } from "@/lib/labels";
 import type { SessionPlayerDto } from "@/components/session/types";
 import type { PaymentMethod } from "@prisma/client";
@@ -48,6 +49,7 @@ export function PaymentDialog({
   const idemKey = React.useRef(newIdempotencyKey());
 
   // Fresh state per open: the parent remounts this dialog with a changing key.
+  useUnsavedGuard(open && amount != null && !saving);
 
   if (!player) return null;
 

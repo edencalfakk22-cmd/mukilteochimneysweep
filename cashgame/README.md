@@ -36,7 +36,7 @@ A player can receive 2,000 ₪ in chips while paying only 500 ₪ — the system
 | Money | Integer agorot everywhere — no floating point |
 | PDF | HTML templates → headless Chromium (playwright-core) |
 | Excel | exceljs (RTL worksheets) |
-| Tests | Vitest (unit + integration), Playwright (E2E, desktop + mobile) |
+| Tests | Vitest (unit + integration), React Testing Library (components), Playwright (E2E, desktop + mobile) |
 
 Details: [ARCHITECTURE.md](./ARCHITECTURE.md) · accounting rules: [ACCOUNTING_RULES.md](./ACCOUNTING_RULES.md) · deployment: [DEPLOYMENT.md](./DEPLOYMENT.md) · Hebrew user guide: [USER_GUIDE_HE.md](./USER_GUIDE_HE.md) · test plan: [TEST_PLAN.md](./TEST_PLAN.md)
 
