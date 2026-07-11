@@ -1,0 +1,69 @@
+@import "tailwindcss";
+
+@theme {
+  /* Neutral, professional financial-tool palette (light, warm gray) */
+  --color-background: #f4f4f2;
+  --color-surface: #ffffff;
+  --color-surface-muted: #f8f8f7;
+  --color-border: #e2e2df;
+  --color-foreground: #1c1c1a;
+  --color-muted: #6b6b66;
+
+  /* Financial semantics — always paired with icons/text, never color alone */
+  --color-money-in: #15803d; /* green: cash received / positive */
+  --color-money-in-bg: #ecfdf3;
+  --color-debt: #b91c1c; /* red: debt / shortage */
+  --color-debt-bg: #fef2f2;
+  --color-warn: #c2410c; /* orange: warning / pending */
+  --color-warn-bg: #fff7ed;
+  --color-chips: #1d4ed8; /* blue: chips issued / informational */
+  --color-chips-bg: #eff6ff;
+
+  --color-primary: #1e293b;
+  --color-primary-hover: #0f172a;
+
+  --font-sans: "Segoe UI", "Helvetica Neue", "Noto Sans Hebrew", "Arial Hebrew", Arial, system-ui, sans-serif;
+
+  --radius-card: 0.75rem;
+}
+
+html {
+  direction: rtl;
+}
+
+body {
+  background: var(--color-background);
+  color: var(--color-foreground);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Large touch targets on interactive elements */
+button,
+[role="button"],
+input,
+select {
+  touch-action: manipulation;
+}
+
+/* Numbers inside Hebrew text stay LTR and aligned */
+.num {
+  direction: ltr;
+  unicode-bidi: isolate;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Visible focus for keyboard navigation */
+:focus-visible {
+  outline: 2px solid var(--color-chips);
+  outline-offset: 2px;
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background: white;
+  }
+}

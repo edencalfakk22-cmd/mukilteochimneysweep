@@ -1,0 +1,341 @@
+// Cash-game management system — Prisma schema
+// All money amounts are stored as INTEGER AGOROT (1 ILS = 100 agorot).
+// The ledger (LedgerTransaction) is append-only: rows are never deleted,
+// mistakes are corrected with REVERSAL transactions that reference the original.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider          = "postgresql"
+  url               = env("DATABASE_URL")
+  shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
+}
+
+enum Role {
+  OWNER
+  MANAGER
+  OPERATOR
+  VIEWER
+}
+
+enum SessionStatus {
+  DRAFT
+  OPEN
+  CLOSING
+  CLOSED
+  REOPENED
+}
+
+enum SessionPlayerStatus {
+  ACTIVE
+  LEFT
+  SETTLED
+}
+
+enum TransactionType {
+  SESSION_BUY_IN
+  SESSION_REBUY
+  PAYMENT_RECEIVED
+  CHIPS_RETURNED
+  CASH_PAID_TO_PLAYER
+  DEBT_CREATED
+  DEBT_PAYMENT
+  CASHOUT_APPLIED_TO_DEBT
+  PLAYER_CREDIT_CREATED
+  PLAYER_CREDIT_USED
+  CASH_DRAWER_DEPOSIT
+  CASH_DRAWER_WITHDRAWAL
+  EXPENSE
+  ADJUSTMENT
+  REVERSAL
+}
+
+enum PaymentMethod {
+  CASH
+  BIT
+  BANK_TRANSFER
+  CREDIT_CARD
+  OTHER
+  UNPAID
+}
+
+enum TransactionStatus {
+  ACTIVE
+  REVERSED
+}
+
+enum CountType {
+  OPENING
+  INTERIM
+  CLOSING
+}
+
+enum CashoutDebtBehavior {
+  DEBT_FIRST
+  PAY_FULL
+  ASK
+}
+
+enum CreditLimitBehavior {
+  WARN
+  BLOCK
+}
+
+model Organization {
+  id              String   @id @default(cuid())
+  name            String
+  defaultCurrency String   @default("ILS")
+  timezone        String   @default("Asia/Jerusalem")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  users        User[]
+  players      Player[]
+  sessions     GameSession[]
+  transactions LedgerTransaction[]
+  auditLogs    AuditLog[]
+  settings     AppSetting?
+}
+
+model User {
+  id             String    @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  name           String
+  username       String    @unique
+  passwordHash   String
+  role           Role
+  isActive       Boolean   @default(true)
+  pinHash        String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  lastLoginAt    DateTime?
+
+  authSessions       AuthSession[]
+  transactions       LedgerTransaction[] @relation("txCreatedBy")
+  reversedTxs        LedgerTransaction[] @relation("txReversedBy")
+  openedSessions     GameSession[]       @relation("sessionOpenedBy")
+  closedSessions     GameSession[]       @relation("sessionClosedBy")
+  cashCounts         CashDrawerCount[]
+  auditLogs          AuditLog[]
+  batches            LedgerBatch[]
+  closingSnapshots   ClosingSnapshot[]
+
+  @@index([organizationId])
+}
+
+model AuthSession {
+  id         String    @id @default(cuid())
+  tokenHash  String    @unique
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt  DateTime  @default(now())
+  expiresAt  DateTime
+  lastSeenAt DateTime  @default(now())
+  lockedAt   DateTime?
+  revokedAt  DateTime?
+  ipAddress  String?
+  userAgent  String?
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model LoginAttempt {
+  id        String   @id @default(cuid())
+  username  String
+  ipAddress String?
+  success   Boolean
+  createdAt DateTime @default(now())
+
+  @@index([username, createdAt])
+}
+
+model Player {
+  id             String   @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  fullName       String
+  phone          String?
+  nickname       String?
+  notes          String?
+  isActive       Boolean  @default(true)
+  creditLimit    Int?     // agorot
+  // Cached balances — always updated inside the same DB transaction as the
+  // ledger write, and re-verified from the ledger by `npm run verify-ledger`.
+  currentDebt    Int      @default(0) // agorot
+  currentCredit  Int      @default(0) // agorot
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  sessionPlayers SessionPlayer[]
+  transactions   LedgerTransaction[]
+
+  @@index([organizationId, fullName])
+  @@index([organizationId, isActive])
+}
+
+model GameSession {
+  id                       String        @id @default(cuid())
+  organizationId           String
+  organization             Organization  @relation(fields: [organizationId], references: [id])
+  name                     String
+  startedAt                DateTime      @default(now())
+  endedAt                  DateTime?
+  status                   SessionStatus @default(OPEN)
+  openedByUserId           String
+  openedBy                 User          @relation("sessionOpenedBy", fields: [openedByUserId], references: [id])
+  closedByUserId           String?
+  closedBy                 User?         @relation("sessionClosedBy", fields: [closedByUserId], references: [id])
+  openingCashAmount        Int           @default(0) // agorot
+  countedClosingCashAmount Int? // agorot
+  notes                    String?
+  version                  Int           @default(0) // optimistic concurrency
+  createdAt                DateTime      @default(now())
+  updatedAt                DateTime      @updatedAt
+
+  sessionPlayers   SessionPlayer[]
+  transactions     LedgerTransaction[]
+  cashCounts       CashDrawerCount[]
+  closingSnapshots ClosingSnapshot[]
+
+  @@index([organizationId, status])
+  @@index([organizationId, startedAt])
+}
+
+model SessionPlayer {
+  id         String              @id @default(cuid())
+  sessionId  String
+  session    GameSession         @relation(fields: [sessionId], references: [id])
+  playerId   String
+  player     Player              @relation(fields: [playerId], references: [id])
+  joinedAt   DateTime            @default(now())
+  leftAt     DateTime?
+  status     SessionPlayerStatus @default(ACTIVE)
+  seatNumber Int?
+  notes      String?
+
+  @@unique([sessionId, playerId])
+  @@index([playerId])
+}
+
+// Groups the ledger transactions created by one user-facing command
+// (e.g. a buy-in = chips + payment + debt) and carries the idempotency key
+// that protects against double submission.
+model LedgerBatch {
+  id              String   @id @default(cuid())
+  idempotencyKey  String   @unique
+  command         String // e.g. "BUY_IN", "PAYMENT", "CASH_OUT", "REVERSAL", ...
+  sessionId       String?
+  playerId        String?
+  createdByUserId String
+  createdBy       User     @relation(fields: [createdByUserId], references: [id])
+  createdAt       DateTime @default(now())
+  resultJson      Json?
+
+  transactions LedgerTransaction[]
+
+  @@index([sessionId])
+}
+
+model LedgerTransaction {
+  id                     String            @id @default(cuid())
+  organizationId         String
+  organization           Organization      @relation(fields: [organizationId], references: [id])
+  sessionId              String?
+  session                GameSession?      @relation(fields: [sessionId], references: [id])
+  playerId               String?
+  player                 Player?           @relation(fields: [playerId], references: [id])
+  type                   TransactionType
+  amount                 Int // agorot, always >= 0
+  paymentMethod          PaymentMethod?
+  createdAt              DateTime          @default(now())
+  createdByUserId        String
+  createdBy              User              @relation("txCreatedBy", fields: [createdByUserId], references: [id])
+  notes                  String?
+  referenceTransactionId String?
+  referenceTransaction   LedgerTransaction? @relation("reversal", fields: [referenceTransactionId], references: [id])
+  reversals              LedgerTransaction[] @relation("reversal")
+  batchId                String?
+  batch                  LedgerBatch?      @relation(fields: [batchId], references: [id])
+  metadata               Json?
+  status                 TransactionStatus @default(ACTIVE)
+  reversedAt             DateTime?
+  reversedByUserId       String?
+  reversedBy             User?             @relation("txReversedBy", fields: [reversedByUserId], references: [id])
+  reversalReason         String?
+
+  @@index([sessionId, type])
+  @@index([playerId, createdAt])
+  @@index([organizationId, createdAt])
+  @@index([batchId])
+}
+
+model CashDrawerCount {
+  id              String      @id @default(cuid())
+  sessionId       String
+  session         GameSession @relation(fields: [sessionId], references: [id])
+  countType       CountType
+  countedAmount   Int // agorot
+  expectedAmount  Int // agorot
+  difference      Int // agorot (counted - expected)
+  countedByUserId String
+  countedBy       User        @relation(fields: [countedByUserId], references: [id])
+  denominations   Json?
+  notes           String?
+  createdAt       DateTime    @default(now())
+
+  @@index([sessionId, createdAt])
+}
+
+model ClosingSnapshot {
+  id              String      @id @default(cuid())
+  sessionId       String
+  session         GameSession @relation(fields: [sessionId], references: [id])
+  createdByUserId String
+  createdBy       User        @relation(fields: [createdByUserId], references: [id])
+  snapshot        Json
+  reason          String?
+  createdAt       DateTime    @default(now())
+
+  @@index([sessionId, createdAt])
+}
+
+model AuditLog {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  userId         String?
+  user           User?        @relation(fields: [userId], references: [id])
+  action         String
+  entityType     String
+  entityId       String?
+  beforeJson     Json?
+  afterJson      Json?
+  reason         String?
+  ipAddress      String?
+  userAgent      String?
+  createdAt      DateTime     @default(now())
+
+  @@index([organizationId, createdAt])
+  @@index([entityType, entityId])
+}
+
+model AppSetting {
+  id                            String              @id @default(cuid())
+  organizationId                String              @unique
+  organization                  Organization        @relation(fields: [organizationId], references: [id])
+  defaultBuyInButtons           Json                @default("[20000, 50000, 100000, 200000]") // agorot
+  requireManagerApprovalForVoid Boolean             @default(true)
+  requireApprovalForReopen      Boolean             @default(true)
+  requireApprovalForPayWithDebt Boolean             @default(true)
+  allowNegativeCashDrawer       Boolean             @default(false)
+  defaultCashoutDebtBehavior    CashoutDebtBehavior @default(DEBT_FIRST)
+  includeHistoricalDebtInCashout Boolean            @default(true)
+  creditLimitBehavior           CreditLimitBehavior @default(WARN)
+  highAmountWarningThreshold    Int                 @default(500000) // agorot = 5,000 ILS
+  sessionAutoLockMinutes        Int                 @default(30)
+  updatedAt                     DateTime            @updatedAt
+}
