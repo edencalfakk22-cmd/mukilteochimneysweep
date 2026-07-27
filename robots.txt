@@ -1,6 +1,5 @@
 User-agent: *
 Allow: /
-Disallow: /thank-you/
-Disallow: /404.html
 
 Sitemap: https://www.mukilteochimneysweep.com/sitemap.xml
+Sitemap: https://www.mukilteochimneysweep.com/feed.xml
