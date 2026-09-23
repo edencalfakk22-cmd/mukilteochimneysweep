@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<title>פוקר טקסס הולדם</title>
+<meta name="description" content="משחק פוקר טקסס הולדם מול בוטים, עם פאנל סוכן להטענת נקודות לשחקנים.">
+<style>
+:root{
+  --bg:#0d1117;--panel:#161b22;--panel2:#1f2630;--line:#2d3642;--text:#e8edf3;--muted:#9aa6b2;
+  --felt:#136a3e;--felt2:#0b4a2a;--rail:#4a2c17;--gold:#f2c14e;--red:#e5484d;--green:#2ecc71;--blue:#3b82f6;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Arial,sans-serif}
+button,input{font:inherit}
+button{cursor:pointer;border:0;border-radius:10px;padding:10px 16px;font-weight:600;color:#fff;background:var(--panel2);transition:filter .15s,transform .05s}
+button:hover:not(:disabled){filter:brightness(1.15)}
+button:active:not(:disabled){transform:translateY(1px)}
+button:disabled{opacity:.4;cursor:not-allowed}
+input{background:#0d1117;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+.wrap{max-width:1100px;margin:0 auto;padding:12px 16px 32px}
+header{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+header h1{font-size:1.3rem;margin:0;display:flex;align-items:center;gap:8px}
+.hbtns{display:flex;gap:8px;flex-wrap:wrap}
+.b-gold{background:var(--gold);color:#221a00}
+.b-red{background:var(--red)}
+.b-green{background:#1f9d55}
+.b-blue{background:var(--blue)}
+
+/* table */
+.table-area{position:relative;width:100%;aspect-ratio:16/9;min-height:360px;margin:8px 0 18px}
+.felt{position:absolute;inset:9% 8%;border-radius:999px;background:radial-gradient(ellipse at center,var(--felt) 0%,var(--felt2) 100%);border:14px solid var(--rail);box-shadow:inset 0 0 40px rgba(0,0,0,.5),0 10px 30px rgba(0,0,0,.6)}
+.center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px}
+.board{display:flex;gap:6px;min-height:72px}
+.pot{background:rgba(0,0,0,.35);padding:4px 14px;border-radius:999px;font-weight:700;color:var(--gold)}
+.msg{font-size:.95rem;text-align:center;min-height:1.3em;padding:0 20px;max-width:80%}
+
+.seat{position:absolute;transform:translate(-50%,-50%);width:clamp(96px,18%,150px);text-align:center;z-index:2}
+.seat .box{background:rgba(13,17,23,.92);border:2px solid var(--line);border-radius:12px;padding:5px 6px;position:relative}
+.seat.turn .box{border-color:var(--gold);box-shadow:0 0 14px rgba(242,193,78,.6)}
+.seat.win .box{border-color:var(--green);box-shadow:0 0 16px rgba(46,204,113,.7)}
+.seat.folded{opacity:.45}
+.seat.out{opacity:.35}
+.seat .name{font-weight:700;font-size:.9rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.seat .chips{color:var(--gold);font-size:.85rem}
+.seat .pend{color:var(--green);font-size:.72rem}
+.seat .status{font-size:.72rem;color:var(--muted);min-height:1em}
+.seat .cards{display:flex;justify-content:center;gap:3px;margin-bottom:4px;min-height:54px}
+.seat .bet{position:absolute;left:50%;transform:translateX(-50%);background:var(--gold);color:#221a00;font-weight:700;font-size:.78rem;padding:1px 8px;border-radius:999px;white-space:nowrap}
+.dealer{position:absolute;top:-8px;inset-inline-start:-8px;width:22px;height:22px;border-radius:50%;background:#fff;color:#000;font-weight:800;font-size:.75rem;display:grid;place-items:center;box-shadow:0 1px 3px #000}
+.s0{left:50%;top:92%}.s1{left:9%;top:72%}.s2{left:9%;top:24%}.s3{left:50%;top:6%}.s4{left:91%;top:24%}.s5{left:91%;top:72%}
+.s0 .bet{top:-88px}.s3 .bet{bottom:-24px}
+.s1 .bet,.s2 .bet{left:calc(100% + 12px);top:50%;transform:translateY(-50%)}
+.s4 .bet,.s5 .bet{left:auto;right:calc(100% + 12px);top:50%;transform:translateY(-50%)}
+
+.card{width:40px;height:56px;border-radius:6px;background:#fff;color:#111;display:flex;flex-direction:column;align-items:center;justify-content:center;font-weight:800;line-height:1;box-shadow:0 2px 4px rgba(0,0,0,.5);direction:ltr}
+.card .r{font-size:1.05rem}.card .su{font-size:1.15rem}
+.card.red{color:#d11}
+.card.back{background:repeating-linear-gradient(45deg,#8b1d2c 0 6px,#a8283a 6px 12px);border:2px solid #fff}
+.board .card{width:48px;height:68px}.board .card .r{font-size:1.3rem}.board .card .su{font-size:1.4rem}
+.card.hl{outline:3px solid var(--gold);outline-offset:1px}
+
+/* controls */
+.controls{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:center}
+.controls .raise{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:center}
+.controls input[type=range]{width:180px;padding:0}
+.controls input[type=number]{width:100px}
+.presets button{padding:6px 10px;font-size:.8rem}
+.hint{color:var(--muted);font-size:.9rem}
+
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px}
+.panel h2{font-size:1rem;margin:0 0 8px}
+.log{height:200px;overflow:auto;font-size:.85rem;line-height:1.5;color:#cfd8e2}
+.log div{border-bottom:1px dashed #222a33;padding:2px 0}
+.help{font-size:.88rem;color:#cfd8e2;line-height:1.6}
+.help ul{margin:4px 0;padding-inline-start:18px}
+
+/* agent dialog */
+dialog{background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:16px;padding:0;width:min(760px,calc(100% - 24px));max-height:calc(100vh - 40px)}
+dialog::backdrop{background:rgba(0,0,0,.65)}
+.dlg-h{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--panel);z-index:1}
+.dlg-h h2{margin:0;font-size:1.1rem}
+.dlg-b{padding:14px 16px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.err{color:var(--red);min-height:1.2em;font-size:.9rem;margin-top:6px}
+.ok{color:var(--green)}
+table.pl{width:100%;border-collapse:collapse;font-size:.9rem}
+table.pl th,table.pl td{padding:6px 4px;border-bottom:1px solid var(--line);text-align:start;vertical-align:middle}
+table.pl input.nm{width:110px}
+table.pl input.amt{width:84px}
+table.pl button{padding:6px 10px;font-size:.82rem}
+.sec{margin-top:18px;padding-top:12px;border-top:1px solid var(--line)}
+.sec h3{margin:0 0 8px;font-size:.95rem}
+.tx{max-height:160px;overflow:auto;font-size:.82rem;color:#cfd8e2}
+.tx div{padding:2px 0;border-bottom:1px dashed #222a33}
+.plus{color:var(--green)}.minus{color:var(--red)}
+
+@media (max-width:720px){
+  .table-area{aspect-ratio:3/4;min-height:460px}
+  .felt{inset:10% 12%}
+  .s0{left:50%;top:91%}.s1{left:14%;top:70%}.s2{left:14%;top:28%}.s3{left:50%;top:8%}.s4{left:86%;top:28%}.s5{left:86%;top:70%}
+  .seat{width:92px}
+  .card{width:32px;height:46px}.card .r{font-size:.9rem}.card .su{font-size:.95rem}
+  .seat .cards{min-height:46px}
+  .s0 .bet{top:-76px}
+  .s1 .bet,.s2 .bet,.s4 .bet,.s5 .bet{left:50%;right:auto;top:auto;bottom:-24px;transform:translateX(-50%)}
+  .board .card{width:38px;height:54px}
+  .board .card .r{font-size:1.05rem}.board .card .su{font-size:1.1rem}
+  .grid2{grid-template-columns:1fr}
+  table.pl .hide-sm{display:none}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>♠️ פוקר טקסס הולדם</h1>
+    <div class="hbtns">
+      <button id="btnDeal" class="b-green">יד חדשה</button>
+      <button id="btnAgent" class="b-gold">🔑 כניסת סוכן</button>
+    </div>
+  </header>
+
+  <div class="table-area" id="tableArea">
+    <div class="felt"></div>
+    <div class="center">
+      <div class="pot" id="pot">קופה: 0</div>
+      <div class="board" id="board"></div>
+      <div class="msg" id="msg"></div>
+    </div>
+    <div id="seats"></div>
+  </div>
+
+  <div class="controls" id="controls">
+    <span class="hint">לחץ "יד חדשה" כדי להתחיל</span>
+  </div>
+
+  <div class="grid2">
+    <div class="panel">
+      <h2>יומן משחק</h2>
+      <div class="log" id="log"></div>
+    </div>
+    <div class="panel help">
+      <h2>איך משחקים</h2>
+      <ul>
+        <li>טקסס הולדם מול בוטים. בליינדים: <b id="blindsTxt"></b>.</li>
+        <li>שחקן שנגמרו לו הנקודות יושב בחוץ עד שסוכן מטעין לו.</li>
+        <li><b>סוכן:</b> לחץ "כניסת סוכן" והזן את קוד הסוכן. בכניסה הראשונה תתבקש לקבוע קוד.</li>
+        <li>הסוכן יכול להטעין / להוריד נקודות, להוסיף ולמחוק שחקנים, לשנות שמות ולהחליף קוד.</li>
+        <li>הטענה לשחקן שנמצא באמצע יד תיכנס בתחילת היד הבאה.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<dialog id="agentDlg">
+  <div class="dlg-h">
+    <h2 id="agentTitle">🔑 פאנל סוכן</h2>
+    <button id="agentClose" aria-label="סגור">✕</button>
+  </div>
+  <div class="dlg-b" id="agentBody"></div>
+</dialog>
+
+<script>
+(() => {
+'use strict';
+
+/* ================= constants & storage ================= */
+const SB = 10, BB = 20, MAX_PLAYERS = 6;
+const STORE_KEY = 'pokerAgentGame.v1';
+const SUITS = ['♠','♥','♦','♣'];
+const RLAB = {11:'J',12:'Q',13:'K',14:'A'};
+const HAND_NAMES = ['קלף גבוה','זוג','שני זוגות','שלישייה','רצף','צבע','פול האוס','רביעייה','רצף צבע'];
+const BOT_NAMES = ['דני','מאיה','יוסי','נועה','אבי','שירה','רון','טל'];
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt = n => Number(n).toLocaleString('he-IL');
+
+let S = load();          // persistent state: players, dealerId, agentHash, tx
+let G = null;            // current hand
+let agentOn = false;     // agent session unlocked (in memory only)
+let busy = false;        // a timer is pending
+
+function defaultState(){
+  return {
+    players:[
+      {id:'you', name:'אתה', chips:1000, pending:0, human:true},
+      {id:'b1', name:'דני', chips:1000, pending:0},
+      {id:'b2', name:'מאיה', chips:1000, pending:0},
+      {id:'b3', name:'יוסי', chips:1000, pending:0},
+      {id:'b4', name:'נועה', chips:1000, pending:0},
+    ],
+    dealerId:null, agentHash:null, tx:[], nextId:5
+  };
+}
+function load(){
+  try{
+    const s = JSON.parse(localStorage.getItem(STORE_KEY));
+    if (s && Array.isArray(s.players) && s.players.some(p=>p.human)) return s;
+  }catch(e){}
+  return defaultState();
+}
+function save(){
+  // if a hand is running, save stacks as they were before the hand (chips in the pot are refunded on reload)
+  const snap = {...S, players:S.players.map(p=>{
+    const h = G && !G.over && G.h[p.id];
+    return {...p, chips:p.chips + (h ? h.total : 0)};
+  })};
+  try{ localStorage.setItem(STORE_KEY, JSON.stringify(snap)); }catch(e){}
+}
+async function hashCode(code){
+  const data = 'poker-agent:' + code;
+  try{
+    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(data));
+    return [...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,'0')).join('');
+  }catch(e){
+    let h = 5381; for (const c of data) h = ((h<<5)+h + c.charCodeAt(0))|0;
+    return 'x' + (h>>>0).toString(16);
+  }
+}
+
+/* ================= cards & evaluation ================= */
+function newDeck(){
+  const d=[]; for (let s=0;s<4;s++) for (let r=2;r<=14;r++) d.push({r,s});
+  for (let i=d.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [d[i],d[j]]=[d[j],d[i]]; }
+  return d;
+}
+function eval5(c){
+  const r = c.map(x=>x.r).sort((a,b)=>b-a);
+  const flush = c[0].s===c[1].s && c[1].s===c[2].s && c[2].s===c[3].s && c[3].s===c[4].s;
+  const cnt = new Map(); for (const x of r) cnt.set(x,(cnt.get(x)||0)+1);
+  const groups = [...cnt].map(([k,v])=>[v,k]).sort((a,b)=>b[0]-a[0]||b[1]-a[1]);
+  let sh = 0;
+  if (cnt.size===5){ if (r[0]-r[4]===4) sh=r[0]; else if (r[0]===14 && r[1]===5) sh=5; }
+  let cat, tb;
+  if (sh && flush){cat=8;tb=[sh];}
+  else if (groups[0][0]===4){cat=7;tb=[groups[0][1],groups[1][1]];}
+  else if (groups[0][0]===3 && groups[1][0]===2){cat=6;tb=[groups[0][1],groups[1][1]];}
+  else if (flush){cat=5;tb=r;}
+  else if (sh){cat=4;tb=[sh];}
+  else if (groups[0][0]===3){cat=3;tb=groups.map(g=>g[1]);}
+  else if (groups[0][0]===2 && groups[1][0]===2){cat=2;tb=groups.map(g=>g[1]);}
+  else if (groups[0][0]===2){cat=1;tb=groups.map(g=>g[1]);}
+  else {cat=0;tb=r;}
+  let s = cat; for (let i=0;i<5;i++) s = s*15 + (tb[i]||0);
+  return s;
+}
+const COMBOS = (()=>{ const out=[]; for(let a=0;a<7;a++)for(let b=a+1;b<7;b++){const k=[];for(let i=0;i<7;i++)if(i!==a&&i!==b)k.push(i);out.push(k);} return out; })();
+function best(cards){ // cards length 5..7 -> {score, five}
+  if (cards.length===5) return {score:eval5(cards), five:cards};
+  let bestS=-1, bestF=null;
+  const n=cards.length;
+  for (const k of COMBOS){
+    if (k.some(i=>i>=n)) continue;
+    const f = k.map(i=>cards[i]);
+    const s = eval5(f); if (s>bestS){bestS=s;bestF=f;}
+  }
+  return {score:bestS, five:bestF};
+}
+function handName(score){
+  const cat = Math.floor(score / 15**5);
+  if (cat===8 && Math.floor(score/15**4)%15===14) return 'רויאל פלאש';
+  return HAND_NAMES[cat];
+}
+// Monte Carlo equity for bots
+function equity(hole, board, nOpp, sims){
+  const known = new Set([...hole,...board].map(c=>c.r*4+c.s));
+  const rest=[]; for(let s=0;s<4;s++)for(let r=2;r<=14;r++) if(!known.has(r*4+s)) rest.push({r,s});
+  let score=0;
+  const need = 5-board.length;
+  for (let t=0;t<sims;t++){
+    const take = need + nOpp*2;
+    for (let i=0;i<take;i++){ const j=i+Math.floor(Math.random()*(rest.length-i)); [rest[i],rest[j]]=[rest[j],rest[i]]; }
+    const b = board.concat(rest.slice(0,need));
+    const mine = best(hole.concat(b)).score;
+    let win=true, ties=0;
+    for (let o=0;o<nOpp;o++){
+      const os = best([rest[need+o*2],rest[need+o*2+1]].concat(b)).score;
+      if (os>mine){win=false;break;} if (os===mine) ties++;
+    }
+    if (win) score += 1/(ties+1);
+  }
+  return score/sims;
+}
+
+/* ================= game flow ================= */
+const P = id => S.players.find(p=>p.id===id);
+const H = p => G.h[p.id];
+const live = () => G.order.filter(p=>!H(p).folded);
+const canAct = p => !H(p).folded && !H(p).allIn;
+const potTotal = () => G.order.reduce((a,p)=>a+H(p).total,0);
+const nextIdx = i => (i+1) % G.order.length;
+
+function log(t){ const el=$('log'); const d=document.createElement('div'); d.innerHTML=t; el.prepend(d); while(el.children.length>150) el.lastChild.remove(); }
+function setMsg(t){ $('msg').innerHTML = t; }
+
+function startHand(){
+  if (G && !G.over) return;
+  // apply pending top-ups
+  for (const p of S.players){ if (p.pending){ p.chips += p.pending; p.pending = 0; } }
+  const seated = S.players.filter(p=>p.chips>0);
+  const me = S.players.find(p=>p.human);
+  if (me.chips<=0){ setMsg('💸 נגמרו לך הנקודות — בקש מהסוכן להטעין לך.'); G=null; render(); save(); return; }
+  if (seated.length<2){ setMsg('אין מספיק שחקנים עם נקודות. הסוכן צריך להטעין לשחקנים.'); G=null; render(); save(); return; }
+
+  // move dealer button to the next seated player (roster order)
+  const rIdx = S.players.findIndex(p=>p.id===S.dealerId);
+  let dealer = null;
+  for (let k=1;k<=S.players.length;k++){ const p=S.players[(rIdx+k+S.players.length)%S.players.length]; if (p.chips>0){dealer=p;break;} }
+  S.dealerId = dealer.id;
+
+  G = {order:seated, h:{}, deck:newDeck(), board:[], street:0, currentBet:0, minRaise:BB, raises:0, over:false, winners:new Set(), reveal:false, hl:new Set()};
+  for (const p of seated) G.h[p.id] = {cards:[], bet:0, total:0, folded:false, allIn:false, acted:false, last:''};
+  const d = G.order.indexOf(dealer);
+  G.dealer = d;
+  const heads = G.order.length===2;
+  const sbI = heads ? d : nextIdx(d);
+  const bbI = nextIdx(sbI);
+  for (let r=0;r<2;r++) for (let k=1;k<=G.order.length;k++) H(G.order[(d+k)%G.order.length]).cards.push(G.deck.pop());
+  put(G.order[sbI], SB); H(G.order[sbI]).last='SB';
+  put(G.order[bbI], BB); H(G.order[bbI]).last='BB';
+  G.currentBet = BB;
+  G.toAct = nextIdx(bbI);
+  log(`<b>— יד חדשה —</b> דילר: ${esc(dealer.name)}`);
+  setMsg('');
+  save();
+  step();
+}
+
+function put(p, amt){
+  const h=H(p); amt=Math.max(0,Math.min(amt,p.chips));
+  p.chips-=amt; h.bet+=amt; h.total+=amt;
+  if (p.chips===0) h.allIn=true;
+  return amt;
+}
+
+function roundDone(){
+  const lv = live();
+  if (lv.length<=1) return true;
+  const actors = lv.filter(p=>!H(p).allIn);
+  if (actors.length===0) return true;
+  if (actors.length===1 && H(actors[0]).bet>=G.currentBet) return true;
+  return actors.every(p=>H(p).acted && H(p).bet===G.currentBet);
+}
+
+function step(){
+  if (G.over) return;
+  if (roundDone()) return endStreet();
+  let guard=0;
+  while ((!canAct(G.order[G.toAct]) || (H(G.order[G.toAct]).acted && H(G.order[G.toAct]).bet===G.currentBet)) && guard++<12) G.toAct=nextIdx(G.toAct);
+  const p = G.order[G.toAct];
+  render();
+  if (!p.human){
+    busy=true;
+    setTimeout(()=>{ busy=false; if (G && !G.over && G.order[G.toAct]===p) botAct(p); }, 650+Math.random()*450);
+  }
+}
+
+function act(p, type, raiseTo){
+  const h=H(p);
+  const toCall = G.currentBet-h.bet;
+  if (type==='fold'){ h.folded=true; h.last='פרש'; log(`${esc(p.name)} פרש`); }
+  else if (type==='call'){
+    if (toCall<=0){ h.last='צ׳ק'; log(`${esc(p.name)} צ׳ק`); }
+    else { const a=put(p,toCall); h.last = h.allIn?'אול-אין':'השווה'; log(`${esc(p.name)} ${h.allIn?'אול-אין':'השווה'} ${fmt(a)}`); }
+  } else if (type==='raise'){
+    raiseTo = Math.min(raiseTo, h.bet+p.chips);
+    if (raiseTo<=G.currentBet) return act(p,'call');
+    const raiseBy = raiseTo-G.currentBet;
+    const wasBet = G.currentBet===0;
+    put(p, raiseTo-h.bet);
+    if (raiseBy>=G.minRaise) G.minRaise=raiseBy;
+    G.currentBet = raiseTo; G.raises++;
+    for (const o of G.order) if (o!==p) H(o).acted=false;
+    h.last = h.allIn?'אול-אין':(wasBet?'הימר':'העלה');
+    log(`${esc(p.name)} ${h.allIn?'אול-אין':(wasBet?'הימר':'העלה ל-')} ${fmt(raiseTo)}`);
+  }
+  h.acted=true;
+  G.toAct = nextIdx(G.toAct);
+  step();
+}
+
+function endStreet(){
+  for (const p of G.order){ const h=H(p); h.bet=0; h.acted=false; if(!h.folded && !h.allIn) h.last=''; }
+  G.currentBet=0; G.minRaise=BB; G.raises=0;
+  const lv = live();
+  if (lv.length===1) return settle();
+  if (G.street===3) return settle();
+  const actors = lv.filter(p=>!H(p).allIn);
+  dealStreet();
+  if (actors.length<2){
+    // nobody left to bet: run the board out
+    G.reveal = true; render();
+    busy=true;
+    return setTimeout(()=>{ busy=false; endStreet(); }, 1100);
+  }
+  G.toAct = nextIdx(G.dealer);
+  step();
+}
+function dealStreet(){
+  G.deck.pop(); // burn
+  const n = G.street===0 ? 3 : 1;
+  for (let i=0;i<n;i++) G.board.push(G.deck.pop());
+  G.street++;
+  log(`<span style="color:#9aa6b2">${['','פלופ','טרן','ריבר'][G.street]}:</span> ${G.board.map(cardTxt).join(' ')}`);
+}
+
+function settle(){
+  G.over = true;
+  const lv = live();
+  const won = {};
+  const add = (p,a)=>{ won[p.id]=(won[p.id]||0)+a; };
+  if (lv.length===1){
+    const w = lv[0]; add(w, potTotal());
+    setMsg(`🏆 ${esc(w.name)} זוכה ב-${fmt(potTotal())}`);
+  } else {
+    G.reveal = true;
+    const sc = {}; for (const p of lv) sc[p.id] = best(H(p).cards.concat(G.board));
+    const levels = [...new Set(G.order.map(p=>H(p).total).filter(t=>t>0))].sort((a,b)=>a-b);
+    let prev=0, carry=0; const lines=[];
+    for (const lvl of levels){
+      let amt = carry; carry = 0;
+      for (const p of G.order){ const t=H(p).total; amt += Math.max(0,Math.min(t,lvl)-prev); }
+      prev = lvl;
+      const elig = lv.filter(p=>H(p).total>=lvl);
+      if (!elig.length){ carry = amt; continue; }
+      const top = Math.max(...elig.map(p=>sc[p.id].score));
+      const ws = elig.filter(p=>sc[p.id].score===top);
+      const share = Math.floor(amt/ws.length); let rem = amt - share*ws.length;
+      // odd chips go to the first winner left of the dealer
+      const ordered = [...ws].sort((a,b)=>((G.order.indexOf(a)-G.dealer+G.order.length)%G.order.length)-((G.order.indexOf(b)-G.dealer+G.order.length)%G.order.length));
+      for (const w of ordered){ add(w, share + (rem>0?1:0)); if(rem>0) rem--; }
+      lines.push({amt, ws, name:handName(top)});
+    }
+    if (carry){ const bestP = lv.reduce((a,b)=>sc[a.id].score>=sc[b.id].score?a:b); add(bestP, carry); }
+    // merge messages
+    const m = lines.map((l,i)=>`${lines.length>1?(i===0?'קופה ראשית':'קופת צד')+': ':''}${l.ws.map(w=>esc(w.name)).join(' ו-')} (${l.name}) ${fmt(l.amt)}`);
+    setMsg('🏆 ' + m.join('<br>'));
+    for (const p of lv) log(`${esc(p.name)} מציג ${H(p).cards.map(cardTxt).join(' ')} — ${handName(sc[p.id].score)}`);
+    // highlight the main winning five
+    const w0 = lines.length ? lines[0].ws[0] : null;
+    if (w0) for (const c of sc[w0.id].five) G.hl.add(c.r*4+c.s);
+  }
+  for (const id in won){ P(id).chips += won[id]; G.winners.add(id); log(`🏆 <b>${esc(P(id).name)}</b> זכה ב-${fmt(won[id])}`); }
+  for (const p of S.players) if (p.chips===0 && !p.pending && G.order.includes(p)) log(`${esc(p.name)} נשאר בלי נקודות`);
+  save();
+  render();
+}
+
+/* ================= bots ================= */
+function botAct(p){
+  const h=H(p);
+  const toCall = G.currentBet-h.bet;
+  const pot = potTotal();
+  const nOpp = Math.min(live().length-1, 4);
+  const eq = equity(h.cards, G.board, nOpp, G.street===0?220:320);
+  const rel = eq*(nOpp+1);                 // >1 means better than a fair share
+  const agg = 0.85 + (p.id.charCodeAt(p.id.length-1)%5)*0.08;
+  const r = Math.random();
+  const maxTo = h.bet+p.chips;
+  const sizeTo = frac => {
+    let to = G.currentBet + Math.max(G.minRaise, Math.round(pot*frac/5)*5);
+    return Math.min(to, maxTo);
+  };
+  const canRaise = p.chips>toCall && G.raises<4;
+  if (toCall<=0){
+    if (canRaise && (rel*agg>1.45 || (rel*agg>1.15 && r<0.35) || r<0.06)) return act(p,'raise',sizeTo(0.45+0.4*Math.random()));
+    return act(p,'call');
+  }
+  const odds = toCall/(pot+toCall);
+  if (canRaise && rel*agg>1.8 && r<0.75) return act(p,'raise',sizeTo(0.6+0.5*Math.random()));
+  if (eq >= odds*0.9 || (toCall<=BB && rel>0.7) || r<0.04) return act(p,'call');
+  return act(p,'fold');
+}
+
+/* ================= rendering ================= */
+function cardTxt(c){ const red=c.s===1||c.s===2; return `<span style="direction:ltr;display:inline-block;color:${red?'#ff6b6b':'#e8edf3'}">${RLAB[c.r]||c.r}${SUITS[c.s]}</span>`; }
+function cardHTML(c, hidden){
+  if (hidden) return '<div class="card back"></div>';
+  const red=c.s===1||c.s===2;
+  const hl = G && G.hl.has(c.r*4+c.s) ? ' hl' : '';
+  return `<div class="card${red?' red':''}${hl}"><span class="r">${RLAB[c.r]||c.r}</span><span class="su">${SUITS[c.s]}</span></div>`;
+}
+function render(){
+  // seats: human always at slot 0, then clockwise in roster order
+  const hi = S.players.findIndex(p=>p.human);
+  const ordered = S.players.map((_,i)=>S.players[(hi+i)%S.players.length]);
+  let html='';
+  ordered.forEach((p,slot)=>{
+    const h = G && G.h[p.id];
+    const isTurn = G && !G.over && h && G.order[G.toAct]===p && !roundDoneSafe();
+    const cls = ['seat','s'+slot];
+    if (isTurn) cls.push('turn');
+    if (G && G.over && G.winners.has(p.id)) cls.push('win');
+    if (h && h.folded) cls.push('folded');
+    if (!h) cls.push('out');
+    let cards='';
+    if (h){ const show = p.human || (G.reveal && !h.folded); if (p.human || !h.folded) cards = h.cards.map(c=>cardHTML(c,!show)).join(''); }
+    let status = '';
+    if (!h) status = p.chips>0 ? 'ממתין ליד הבאה' : 'אין נקודות – ממתין להטענה';
+    else if (h.folded) status='פרש';
+    else if (h.allIn) status='אול-אין';
+    else status = h.last||'';
+    html += `<div class="${cls.join(' ')}">
+      <div class="cards">${cards}</div>
+      <div class="box">
+        ${G && G.order[G.dealer]===p ? '<div class="dealer">D</div>':''}
+        <div class="name">${p.human?'👤 ':'🤖 '}${esc(p.name)}</div>
+        <div class="chips">🪙 ${fmt(p.chips)}</div>
+        ${p.pending?`<div class="pend">+${fmt(p.pending)} ממתין</div>`:''}
+        <div class="status">${esc(status)}</div>
+        ${h && h.bet>0 ? `<div class="bet">${fmt(h.bet)}</div>`:''}
+      </div></div>`;
+  });
+  $('seats').innerHTML = html;
+  $('board').innerHTML = G ? G.board.map(c=>cardHTML(c,false)).join('') : '';
+  $('pot').textContent = 'קופה: ' + fmt(G ? potTotal() : 0);
+  $('btnDeal').disabled = !!(G && !G.over);
+  renderControls();
+}
+function roundDoneSafe(){ try{ return roundDone(); }catch(e){ return true; } }
+
+function renderControls(){
+  const c = $('controls');
+  const me = S.players.find(p=>p.human);
+  if (!G || G.over){
+    c.innerHTML = `<span class="hint">${me.chips>0?'לחץ "יד חדשה" כדי להמשיך':'אין לך נקודות — פנה לסוכן להטענה'}</span>`;
+    return;
+  }
+  const p = G.order[G.toAct];
+  if (!p || !p.human || roundDoneSafe() || busy){
+    const h = G.h[me.id];
+    c.innerHTML = `<span class="hint">${h && !h.folded ? (p && !p.human ? `⏳ ${esc(p.name)} חושב...` : '⏳ ...') : 'פרשת מהיד — צופה'}</span>`;
+    return;
+  }
+  const h = H(me);
+  const toCall = Math.min(G.currentBet-h.bet, me.chips);
+  const maxTo = h.bet+me.chips;
+  const minTo = Math.min(G.currentBet+G.minRaise, maxTo);
+  const canRaise = me.chips > G.currentBet-h.bet;
+  const pot = potTotal();
+  const potTo = f => Math.max(minTo, Math.min(maxTo, G.currentBet + Math.round((pot+toCall)*f/5)*5));
+  c.innerHTML = `
+    <button class="b-red" id="aFold">פרוש</button>
+    <button class="b-blue" id="aCall">${toCall>0?`השווה ${fmt(toCall)}`:'צ׳ק'}</button>
+    ${canRaise?`<div class="raise">
+      <input type="range" id="rRange" min="${minTo}" max="${maxTo}" step="5" value="${minTo}">
+      <input type="number" id="rNum" min="${minTo}" max="${maxTo}" step="5" value="${minTo}">
+      <button class="b-green" id="aRaise">${G.currentBet===0?'הימר':'העלה ל'} <span id="rLbl">${fmt(minTo)}</span></button>
+      <span class="presets"><button data-f="0.5">½ קופה</button><button data-f="1">קופה</button><button data-all="1">אול-אין</button></span>
+    </div>`:''}
+    <span class="hint">להשוואה: ${fmt(Math.max(0,toCall))} · בקופה: ${fmt(pot)}</span>`;
+  $('aFold').onclick = ()=>act(me,'fold');
+  $('aCall').onclick = ()=>act(me,'call');
+  if (canRaise){
+    const rr=$('rRange'), rn=$('rNum'), lbl=$('rLbl');
+    const setV = v => { v=Math.max(minTo,Math.min(maxTo,Math.round(+v||minTo))); rr.value=v; rn.value=v; lbl.textContent=fmt(v)+(v===maxTo?' (אול-אין)':''); };
+    rr.oninput = ()=>setV(rr.value); rn.onchange = ()=>setV(rn.value);
+    c.querySelectorAll('.presets button').forEach(b=>b.onclick=()=>setV(b.dataset.all?maxTo:potTo(+b.dataset.f)));
+    $('aRaise').onclick = ()=>act(me,'raise',+rn.value);
+  }
+}
+
+/* ================= agent panel ================= */
+const dlg = $('agentDlg');
+$('btnAgent').onclick = ()=>{ renderAgent(); dlg.showModal(); };
+$('agentClose').onclick = ()=>dlg.close();
+dlg.addEventListener('click', e=>{ if (e.target===dlg) dlg.close(); });
+
+function inActiveHand(p){ return !!(G && !G.over && G.h[p.id]); }
+function addTx(text, cls){ S.tx.unshift({t:Date.now(), text, cls}); S.tx = S.tx.slice(0,100); }
+
+function renderAgent(err=''){
+  const b = $('agentBody');
+  if (!S.agentHash){
+    b.innerHTML = `<p>זו הכניסה הראשונה — קבע קוד סוכן (לפחות 4 תווים).</p>
+      <div class="row"><input type="password" id="c1" placeholder="קוד חדש" autocomplete="new-password"><input type="password" id="c2" placeholder="אימות קוד" autocomplete="new-password"><button class="b-gold" id="cSet">קבע קוד</button></div>
+      <div class="err">${esc(err)}</div>`;
+    $('cSet').onclick = async ()=>{
+      const a=$('c1').value, c=$('c2').value;
+      if (a.length<4) return renderAgent('הקוד חייב להכיל לפחות 4 תווים');
+      if (a!==c) return renderAgent('הקודים לא תואמים');
+      S.agentHash = await hashCode(a); agentOn = true; addTx('קוד סוכן נקבע'); save(); renderAgent();
+    };
+    $('c1').focus();
+    return;
+  }
+  if (!agentOn){
+    b.innerHTML = `<p>הזן קוד סוכן:</p>
+      <form class="row" id="loginF"><input type="password" id="code" placeholder="קוד סוכן" autocomplete="current-password"><button class="b-gold">כניסה</button></form>
+      <div class="err">${esc(err)}</div>`;
+    $('loginF').onsubmit = async e=>{
+      e.preventDefault();
+      if ((await hashCode($('code').value))===S.agentHash){ agentOn=true; renderAgent(); }
+      else renderAgent('קוד שגוי');
+    };
+    $('code').focus();
+    return;
+  }
+  const rows = S.players.map(p=>`<tr data-id="${p.id}">
+      <td><input class="nm" value="${esc(p.name)}" maxlength="14"></td>
+      <td>🪙 ${fmt(p.chips)}${p.pending?`<div class="ok" style="font-size:.75rem">+${fmt(p.pending)} ממתין</div>`:''}${inActiveHand(p)?'<div class="hint" style="font-size:.72rem">ביד פעילה</div>':''}</td>
+      <td><input class="amt" type="number" min="1" step="10" placeholder="סכום"></td>
+      <td class="row" style="gap:4px"><button class="b-green" data-a="add">➕ הטען</button><button class="b-red" data-a="sub">➖ הורד</button>${p.human?'':'<button data-a="del" title="מחק שחקן">🗑️</button>'}</td>
+    </tr>`).join('');
+  b.innerHTML = `
+    <div class="row" style="justify-content:space-between"><span class="ok">✔ מחובר כסוכן</span><button id="logout">התנתק</button></div>
+    <div class="sec"><h3>שחקנים ונקודות</h3>
+      <table class="pl"><thead><tr><th>שם</th><th>נקודות</th><th>סכום</th><th>פעולה</th></tr></thead><tbody>${rows}</tbody></table>
+      <div class="row" style="margin-top:8px;gap:6px"><span class="hint">הטענה מהירה לכולם:</span>
+        <button data-all="100">+100</button><button data-all="500">+500</button><button data-all="1000">+1,000</button></div>
+      <div class="err" id="aErr">${esc(err)}</div>
+    </div>
+    <div class="sec"><h3>הוספת שחקן (בוט)</h3>
+      <div class="row"><input id="npName" placeholder="שם" maxlength="14"><input id="npChips" type="number" min="0" step="10" value="1000" style="width:110px"><button class="b-blue" id="npAdd" ${S.players.length>=MAX_PLAYERS?'disabled':''}>הוסף</button><span class="hint">${S.players.length}/${MAX_PLAYERS} שחקנים</span></div>
+    </div>
+    <div class="sec"><h3>החלפת קוד סוכן</h3>
+      <div class="row"><input type="password" id="nc1" placeholder="קוד חדש" autocomplete="new-password"><input type="password" id="nc2" placeholder="אימות" autocomplete="new-password"><button id="ncSet">עדכן קוד</button></div>
+    </div>
+    <div class="sec"><h3>היסטוריית פעולות סוכן</h3>
+      <div class="tx">${S.tx.length?S.tx.map(t=>`<div class="${t.cls||''}">${new Date(t.t).toLocaleString('he-IL')} — ${esc(t.text)}</div>`).join(''):'<span class="hint">אין פעולות עדיין</span>'}</div>
+    </div>`;
+
+  $('logout').onclick = ()=>{ agentOn=false; renderAgent(); };
+  b.querySelectorAll('tr[data-id]').forEach(tr=>{
+    const p = P(tr.dataset.id);
+    tr.querySelector('.nm').onchange = e=>{
+      const v = e.target.value.trim(); if (!v) return renderAgent('שם לא יכול להיות ריק');
+      addTx(`שינוי שם: ${p.name} ← ${v}`); p.name=v; save(); render(); renderAgent();
+    };
+    tr.querySelectorAll('button[data-a]').forEach(btn=>btn.onclick=()=>{
+      const a = btn.dataset.a;
+      if (a==='del'){
+        if (inActiveHand(p)) return renderAgent('לא ניתן למחוק שחקן באמצע יד');
+        if (!confirm(`למחוק את ${p.name}?`)) return;
+        S.players = S.players.filter(x=>x!==p); addTx(`נמחק שחקן: ${p.name} (${fmt(p.chips)} נקודות)`,'minus');
+        save(); render(); return renderAgent();
+      }
+      const amt = Math.floor(+tr.querySelector('.amt').value);
+      if (!(amt>0)) return renderAgent('הזן סכום חיובי');
+      if (a==='add') loadChips(p, amt);
+      else {
+        if (inActiveHand(p)) return renderAgent('לא ניתן להוריד נקודות משחקן באמצע יד — נסה בסוף היד');
+        const real = Math.min(amt, p.chips + p.pending);
+        const fromPending = Math.min(real, p.pending); p.pending -= fromPending; p.chips -= (real-fromPending);
+        addTx(`הורדה: ${p.name} −${fmt(real)} (יתרה ${fmt(p.chips)})`,'minus');
+      }
+      save(); render(); renderAgent();
+    });
+  });
+  b.querySelectorAll('button[data-all]').forEach(btn=>btn.onclick=()=>{
+    const amt=+btn.dataset.all; for (const p of S.players) loadChips(p, amt); save(); render(); renderAgent();
+  });
+  $('npAdd').onclick = ()=>{
+    if (S.players.length>=MAX_PLAYERS) return;
+    const name = $('npName').value.trim() || BOT_NAMES.find(n=>!S.players.some(p=>p.name===n)) || ('בוט '+S.nextId);
+    const chips = Math.max(0, Math.floor(+$('npChips').value||0));
+    const p = {id:'b'+(S.nextId++), name, chips:0, pending:0};
+    S.players.push(p);
+    addTx(`נוסף שחקן: ${name}`);
+    if (chips) loadChips(p, chips);
+    save(); render(); renderAgent();
+  };
+  $('ncSet').onclick = async ()=>{
+    const a=$('nc1').value, c=$('nc2').value;
+    if (a.length<4) return renderAgent('הקוד חייב להכיל לפחות 4 תווים');
+    if (a!==c) return renderAgent('הקודים לא תואמים');
+    S.agentHash = await hashCode(a); addTx('קוד הסוכן הוחלף'); save(); renderAgent();
+  };
+}
+function loadChips(p, amt){
+  if (inActiveHand(p)){ p.pending += amt; addTx(`הטענה: ${p.name} +${fmt(amt)} (תיכנס ביד הבאה)`,'plus'); }
+  else { p.chips += amt; addTx(`הטענה: ${p.name} +${fmt(amt)} (יתרה ${fmt(p.chips)})`,'plus'); }
+}
+
+/* ================= init ================= */
+$('btnDeal').onclick = startHand;
+$('blindsTxt').textContent = `${SB}/${BB}`;
+render();
+log('ברוך הבא! לחץ "יד חדשה" כדי להתחיל.');
+})();
+</script>
+</body>
+</html>
