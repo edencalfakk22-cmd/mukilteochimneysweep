@@ -2,9 +2,11 @@ package com.questclaude.vision
 
 import ai.onnxruntime.OnnxTensor
 import ai.onnxruntime.OrtEnvironment
+import ai.onnxruntime.OrtException
 import ai.onnxruntime.OrtSession
 import android.content.Context
 import android.graphics.Bitmap
+import android.util.Log
 import com.questclaude.vision.poker.CardModel
 import java.nio.FloatBuffer
 
@@ -14,14 +16,30 @@ class CardDetector(context: Context) : AutoCloseable {
     private val session: OrtSession
     private val classToCard: IntArray
 
+    /** Which ONNX Runtime engine runs the model, shown on screen for diagnostics. */
+    val engine: String
+
     init {
         val model = try {
             context.assets.open(MODEL_ASSET).use { it.readBytes() }
         } catch (e: java.io.IOException) {
             throw IllegalStateException("קובץ המודל חסר. בנה את האפליקציה מחדש כשהמחשב מחובר לאינטרנט (ראה README).", e)
         }
-        val options = OrtSession.SessionOptions().apply { setIntraOpNumThreads(4) }
-        session = env.createSession(model, options)
+        // XNNPACK runs convolutions much faster on ARM CPUs; fall back to the default engine
+        // if it is unavailable on this device.
+        val accelerated = try {
+            val options = OrtSession.SessionOptions().apply {
+                addXnnpack(mapOf("intra_op_num_threads" to THREADS.toString()))
+                setIntraOpNumThreads(1)
+            }
+            env.createSession(model, options)
+        } catch (e: OrtException) {
+            Log.w(TAG, "XNNPACK unavailable, using the default CPU engine", e)
+            null
+        }
+        session = accelerated
+            ?: env.createSession(model, OrtSession.SessionOptions().apply { setIntraOpNumThreads(THREADS) })
+        engine = if (accelerated != null) "XNNPACK" else "CPU"
         val names = session.metadata.customMetadata["names"]
             ?: throw IllegalStateException("למודל אין רשימת קלפים (names)")
         classToCard = CardModel.parseClassNames(names)
@@ -61,5 +79,7 @@ class CardDetector(context: Context) : AutoCloseable {
 
     private companion object {
         const val MODEL_ASSET = "cards.onnx"
+        const val THREADS = 4
+        const val TAG = "PokerAssistant"
     }
 }

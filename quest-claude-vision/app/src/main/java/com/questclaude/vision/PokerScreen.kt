@@ -80,6 +80,7 @@ fun PokerScreen(
     onPotChange: (String) -> Unit,
     onToCallChange: (String) -> Unit,
     onNewHand: () -> Unit,
+    onSaveFrame: () -> Unit,
 ) {
     var editing by remember { mutableStateOf<CardSlot?>(null) }
     val cameraReady = state.cameraReady
@@ -102,7 +103,7 @@ fun PokerScreen(
             Text("זום למרכז (לקלפים רחוקים)", fontSize = 18.sp)
             state.detectMs?.let {
                 Spacer(Modifier.width(24.dp))
-                Text("זמן זיהוי: $it ms לתמונה", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("זמן זיהוי לתמונה: $it אלפיות שנייה" + (state.engine?.let { e -> " · $e" } ?: ""), color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
 
@@ -188,6 +189,7 @@ fun PokerScreen(
                 detections = state.detections,
                 title = if (state.autoMode) "מה המודל רואה עכשיו:" else "מה המודל זיהה בצילום האחרון:",
                 zoom = state.zoom,
+                onSave = onSaveFrame,
             )
         }
     }
@@ -220,10 +222,21 @@ private fun autoStatus(state: PokerState): String {
 
 /** The last camera frame with a box and label on every card corner the model recognised. */
 @Composable
-private fun Snapshot(image: ImageBitmap, detections: List<CardModel.Detection>, title: String, zoom: Boolean) {
+private fun Snapshot(
+    image: ImageBitmap,
+    detections: List<CardModel.Detection>,
+    title: String,
+    zoom: Boolean,
+    onSave: () -> Unit,
+) {
     val textMeasurer = rememberTextMeasurer()
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(title, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(title, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.width(16.dp))
+            // Saves the frame on the headset so a misread can be sent back for tuning.
+            TextButton(onClick = onSave) { Text("💾 שמור צילום לבדיקה") }
+        }
         Box(
             Modifier
                 .height(280.dp)

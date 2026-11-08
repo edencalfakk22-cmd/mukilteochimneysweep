@@ -47,6 +47,7 @@ class MainActivity : ComponentActivity() {
                             onPotChange = vm::onPotChange,
                             onToCallChange = vm::onToCallChange,
                             onNewHand = vm::newHand,
+                            onSaveFrame = vm::saveFrame,
                         )
                     }
                 }

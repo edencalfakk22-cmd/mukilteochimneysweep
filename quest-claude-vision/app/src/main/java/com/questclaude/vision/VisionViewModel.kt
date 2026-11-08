@@ -1,10 +1,18 @@
 package com.questclaude.vision
 
 import android.app.Application
+import android.content.ContentValues
+import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.os.Environment
 import android.os.SystemClock
+import android.provider.MediaStore
 import android.util.Log
+import androidx.core.content.edit
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -46,6 +54,8 @@ data class PokerState(
     val zoom: Boolean = false,
     /** How long the last frame took to analyse, in milliseconds. */
     val detectMs: Long? = null,
+    /** Which ONNX Runtime engine runs the detector ("XNNPACK" or "CPU"). */
+    val engine: String? = null,
     val hole: List<Int?> = List(2) { null },
     val board: List<Int?> = List(5) { null },
     val opponents: Int = 1,
@@ -83,8 +93,23 @@ data class PokerState(
 }
 
 class VisionViewModel(app: Application) : AndroidViewModel(app) {
-    var poker by mutableStateOf(PokerState())
+    /** Remembers the user's settings between launches. */
+    private val prefs = app.getSharedPreferences("settings", Context.MODE_PRIVATE)
+
+    var poker by mutableStateOf(
+        PokerState(
+            autoMode = prefs.getBoolean(KEY_AUTO, true),
+            zoom = prefs.getBoolean(KEY_ZOOM, false),
+            opponents = prefs.getInt(KEY_OPPONENTS, 1).coerceIn(1, 9),
+            opponentStyle = OpponentStyle.entries.firstOrNull { it.name == prefs.getString(KEY_STYLE, null) }
+                ?: OpponentStyle.ANY,
+        ),
+    )
         private set
+
+    /** The last camera frame as JPEG, kept so it can be saved for tuning the detector. */
+    @Volatile
+    private var lastJpeg: ByteArray? = null
 
     private val camera = PassthroughCamera(app)
 
@@ -105,7 +130,7 @@ class VisionViewModel(app: Application) : AndroidViewModel(app) {
     init {
         viewModelScope.launch {
             try {
-                detector.await()
+                poker = poker.copy(engine = detector.await().engine)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -178,6 +203,7 @@ class VisionViewModel(app: Application) : AndroidViewModel(app) {
 
     private suspend fun captureAndDetect(model: CardDetector): Pair<Bitmap, List<CardModel.Detection>> {
         val jpeg = camera.captureJpeg()
+        lastJpeg = jpeg
         val zoom = poker.zoom
         return withContext(Dispatchers.Default) {
             val frame = BitmapFactory.decodeByteArray(jpeg, 0, jpeg.size)
@@ -196,12 +222,61 @@ class VisionViewModel(app: Application) : AndroidViewModel(app) {
 
     fun setAutoMode(enabled: Boolean) {
         poker = poker.copy(autoMode = enabled, error = null, note = null)
+        saveSettings()
         if (enabled) startAutoLoop() else stopAutoLoop()
     }
 
     fun setZoom(enabled: Boolean) {
         poker = poker.copy(zoom = enabled)
+        saveSettings()
         recentFrames.clear() // Frames from the other view would not agree with the new ones.
+    }
+
+    // ---- Saving a frame ----
+
+    /**
+     * Saves the last camera frame to Pictures/PokerAssistant, so a frame where detection went
+     * wrong can be copied off the headset and used to tune the detector.
+     */
+    fun saveFrame() {
+        val jpeg = lastJpeg ?: run {
+            poker = poker.copy(error = "אין עדיין צילום לשמור.")
+            return
+        }
+        viewModelScope.launch {
+            try {
+                val name = withContext(Dispatchers.IO) { saveToPictures(jpeg) }
+                poker = poker.copy(note = "הצילום נשמר במשקפיים: Pictures/PokerAssistant/$name")
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                poker = poker.copy(error = "השמירה נכשלה: ${e.message}")
+            }
+        }
+    }
+
+    private fun saveToPictures(jpeg: ByteArray): String {
+        val name = "poker_" + SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date()) + ".jpg"
+        val values = ContentValues().apply {
+            put(MediaStore.Images.Media.DISPLAY_NAME, name)
+            put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
+            put(MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/PokerAssistant")
+        }
+        val resolver = getApplication<Application>().contentResolver
+        val uri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
+            ?: throw IllegalStateException("המערכת לא אישרה יצירת קובץ")
+        resolver.openOutputStream(uri)?.use { it.write(jpeg) }
+            ?: throw IllegalStateException("לא הצלחתי לכתוב את הקובץ")
+        return name
+    }
+
+    private fun saveSettings() {
+        prefs.edit {
+            putBoolean(KEY_AUTO, poker.autoMode)
+            putBoolean(KEY_ZOOM, poker.zoom)
+            putInt(KEY_OPPONENTS, poker.opponents)
+            putString(KEY_STYLE, poker.opponentStyle.name)
+        }
     }
 
     /**
@@ -312,12 +387,14 @@ class VisionViewModel(app: Application) : AndroidViewModel(app) {
         val count = (poker.opponents + delta).coerceIn(1, 9)
         if (count == poker.opponents) return
         poker = poker.copy(opponents = count)
+        saveSettings()
         recalculate()
     }
 
     fun setOpponentStyle(style: OpponentStyle) {
         if (style == poker.opponentStyle) return
         poker = poker.copy(opponentStyle = style)
+        saveSettings()
         recalculate()
     }
 
@@ -342,6 +419,7 @@ class VisionViewModel(app: Application) : AndroidViewModel(app) {
         autoMode = poker.autoMode,
         zoom = poker.zoom,
         detectMs = poker.detectMs,
+        engine = poker.engine,
         opponents = poker.opponents,
         opponentStyle = poker.opponentStyle,
     )
@@ -376,6 +454,11 @@ class VisionViewModel(app: Application) : AndroidViewModel(app) {
     private companion object {
         /** Filter `adb logcat -s PokerAssistant` to see every frame's detections. */
         const val TAG = "PokerAssistant"
+
+        const val KEY_AUTO = "auto_mode"
+        const val KEY_ZOOM = "zoom"
+        const val KEY_OPPONENTS = "opponents"
+        const val KEY_STYLE = "opponent_style"
 
         // Button scans: 3 frames, a card must appear in 2.
         const val SCAN_FRAMES = 3
