@@ -18,6 +18,8 @@ import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeout
 
 // Quest-specific camera metadata, as documented by Meta for the Passthrough Camera API.
@@ -43,6 +45,7 @@ class PassthroughCamera(context: Context) {
 
     @Volatile
     private var pendingFrame: CompletableDeferred<ByteArray>? = null
+    private val captureLock = Mutex()
 
     val isOpen: Boolean get() = session != null
 
@@ -124,12 +127,12 @@ class PassthroughCamera(context: Context) {
         session = captureSession
     }
 
-    /** Returns the next camera frame as JPEG bytes. */
-    suspend fun captureJpeg(timeoutMs: Long = 3_000): ByteArray {
+    /** Returns the next camera frame as JPEG bytes. Concurrent callers take turns. */
+    suspend fun captureJpeg(timeoutMs: Long = 3_000): ByteArray = captureLock.withLock {
         check(isOpen) { "המצלמה לא פעילה" }
         val frame = CompletableDeferred<ByteArray>()
         pendingFrame = frame
-        return try {
+        try {
             withTimeout(timeoutMs) { frame.await() }
         } finally {
             pendingFrame = null
