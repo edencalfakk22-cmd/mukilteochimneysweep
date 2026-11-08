@@ -16,8 +16,8 @@ android {
         applicationId = "com.questclaude.vision"
         minSdk = 32
         targetSdk = 34
-        versionCode = 2
-        versionName = "0.3"
+        versionCode = 3
+        versionName = "0.4"
         // Quest headsets are arm64; skipping other ABIs keeps the APK small.
         ndk { abiFilters += "arm64-v8a" }
     }

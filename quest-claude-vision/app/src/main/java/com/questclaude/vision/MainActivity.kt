@@ -38,6 +38,7 @@ class MainActivity : ComponentActivity() {
                     Surface(Modifier.fillMaxSize()) {
                         PokerScreen(
                             state = vm.poker,
+                            onAutoModeChange = vm::setAutoMode,
                             onScan = vm::scanCards,
                             onSetCard = vm::setCard,
                             onChangeOpponents = vm::changeOpponents,

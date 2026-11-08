@@ -35,6 +35,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -68,6 +69,7 @@ private fun pct(value: Double) = String.format(Locale.US, "%.1f%%", value * 100)
 @Composable
 fun PokerScreen(
     state: PokerState,
+    onAutoModeChange: (Boolean) -> Unit,
     onScan: (ScanTarget) -> Unit,
     onSetCard: (CardSlot, Int?) -> Unit,
     onChangeOpponents: (Int) -> Unit,
@@ -77,7 +79,7 @@ fun PokerScreen(
 ) {
     var editing by remember { mutableStateOf<CardSlot?>(null) }
     val cameraReady = state.cameraReady
-    val canScan = cameraReady && state.scanning == null
+    val canScan = cameraReady && state.scanning == null && !state.autoMode
 
     Column(
         modifier = Modifier
@@ -86,6 +88,12 @@ fun PokerScreen(
             .padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Switch(checked = state.autoMode, onCheckedChange = onAutoModeChange)
+            Text("זיהוי אוטומטי", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            Text(autoStatus(state), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 18.sp)
+        }
+
         CardRow(
             title = "הקלפים שלי",
             cards = state.hole,
@@ -144,13 +152,20 @@ fun PokerScreen(
             state.result != null -> Results(state, state.result)
             state.calculating -> LinearProgressIndicator(Modifier.fillMaxWidth())
             else -> Text(
-                "צלם או בחר את שני הקלפים שלך כדי לראות סיכויים.",
+                if (state.autoMode) "הסתכל מקרוב על שני הקלפים שלך, והסיכויים יופיעו כאן."
+                else "צלם או בחר את שני הקלפים שלך כדי לראות סיכויים.",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 18.sp,
             )
         }
 
-        state.snapshot?.let { Snapshot(it, state.detections) }
+        state.snapshot?.let {
+            Snapshot(
+                image = it,
+                detections = state.detections,
+                title = if (state.autoMode) "מה המודל רואה עכשיו:" else "מה המודל זיהה בצילום האחרון:",
+            )
+        }
     }
 
     editing?.let { slot ->
@@ -166,12 +181,25 @@ fun PokerScreen(
     }
 }
 
+/** What automatic mode is waiting for, following the order of a hand. */
+private fun autoStatus(state: PokerState): String {
+    if (!state.autoMode) return "כבוי: צלם בכפתורים"
+    val boardCount = state.board.count { it != null }
+    return when {
+        !state.cameraReady -> "מחכה למצלמה…"
+        state.hole.any { it == null } -> "מחפש את הקלפים שלך: הסתכל עליהם מקרוב"
+        boardCount == 0 -> "מחכה לפלופ"
+        boardCount < 5 -> "מחכה לקלף הבא על השולחן"
+        else -> "היד הושלמה. כשיחולקו קלפים חדשים תתחיל יד חדשה"
+    }
+}
+
 /** The last camera frame with a box and label on every card corner the model recognised. */
 @Composable
-private fun Snapshot(image: ImageBitmap, detections: List<CardModel.Detection>) {
+private fun Snapshot(image: ImageBitmap, detections: List<CardModel.Detection>, title: String) {
     val textMeasurer = rememberTextMeasurer()
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text("מה המודל זיהה בצילום האחרון:", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(title, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Box(
             Modifier
                 .height(280.dp)
