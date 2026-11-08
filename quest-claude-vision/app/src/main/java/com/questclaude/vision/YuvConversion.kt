@@ -40,7 +40,7 @@ fun yuv420ToNv21(width: Int, height: Int, y: YuvPlane, u: YuvPlane, v: YuvPlane)
     return out
 }
 
-/** Encodes a camera frame as JPEG bytes, ready to send to Claude. */
+/** Encodes a camera frame as JPEG bytes. */
 fun Image.toJpeg(quality: Int = 85): ByteArray {
     require(format == ImageFormat.YUV_420_888) { "Unexpected image format $format" }
     val (yp, up, vp) = planes.map { YuvPlane(it.buffer, it.rowStride, it.pixelStride) }

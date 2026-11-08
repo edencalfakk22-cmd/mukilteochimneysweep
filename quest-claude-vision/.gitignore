@@ -1,4 +1,4 @@
-# local.properties holds the SDK path and your ANTHROPIC_API_KEY - never commit it
+# local.properties holds the Android SDK path of your computer
 local.properties
 .gradle/
 .kotlin/
@@ -8,3 +8,6 @@ app/build/
 *.iml
 captures/
 .DS_Store
+
+# Downloaded at build time (see app/build.gradle.kts)
+app/src/main/assets/cards.onnx

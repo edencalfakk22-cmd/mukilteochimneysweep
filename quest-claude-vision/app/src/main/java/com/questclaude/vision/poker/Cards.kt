@@ -9,9 +9,6 @@ object Cards {
     const val SUITS = "shdc"
     private const val SUIT_SYMBOLS = "♠♥♦♣"
 
-    /** All 52 two-letter codes ("As", "Td", "7c"...), the format Claude is asked to return. */
-    val ALL_CODES: List<String> = (0 until 52).map { code(it) }
-
     fun of(rank: Int, suit: Int): Int = rank * 4 + suit
     fun rank(card: Int): Int = card shr 2
     fun suit(card: Int): Int = card and 3

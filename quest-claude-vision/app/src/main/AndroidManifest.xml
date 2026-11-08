@@ -1,7 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
-    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- The app works fully offline. ONNX Runtime's library manifest requests network access,
+         which this app never uses, so strip it from the merged manifest. -->
+    <uses-permission
+        android:name="android.permission.INTERNET"
+        tools:node="remove" />
+    <uses-permission
+        android:name="android.permission.ACCESS_NETWORK_STATE"
+        tools:node="remove" />
+
     <!-- Passthrough Camera API (Quest 3 / 3S, Horizon OS v74+). Same declarations as
          Meta's official sample: github.com/meta-quest/Meta-Passthrough-Camera-API-Samples -->
     <uses-permission android:name="android.permission.CAMERA" />

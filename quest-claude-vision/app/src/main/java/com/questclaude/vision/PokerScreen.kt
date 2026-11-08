@@ -1,7 +1,17 @@
 package com.questclaude.vision
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.drawText
+import androidx.compose.ui.text.rememberTextMeasurer
+import com.questclaude.vision.poker.CardModel
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -36,7 +46,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -59,7 +68,6 @@ private fun pct(value: Double) = String.format(Locale.US, "%.1f%%", value * 100)
 @Composable
 fun PokerScreen(
     state: PokerState,
-    cameraReady: Boolean,
     onScan: (ScanTarget) -> Unit,
     onSetCard: (CardSlot, Int?) -> Unit,
     onChangeOpponents: (Int) -> Unit,
@@ -68,6 +76,7 @@ fun PokerScreen(
     onNewHand: () -> Unit,
 ) {
     var editing by remember { mutableStateOf<CardSlot?>(null) }
+    val cameraReady = state.cameraReady
     val canScan = cameraReady && state.scanning == null
 
     Column(
@@ -129,7 +138,7 @@ fun PokerScreen(
         }
 
         state.error?.let { Text(it, color = MaterialTheme.colorScheme.error, fontSize = 18.sp) }
-        state.note?.let { Text("Claude: $it", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        state.note?.let { Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant) }
 
         when {
             state.result != null -> Results(state, state.result)
@@ -141,14 +150,7 @@ fun PokerScreen(
             )
         }
 
-        state.snapshot?.let {
-            Image(
-                bitmap = it,
-                contentDescription = "התמונה האחרונה שנשלחה ל-Claude",
-                modifier = Modifier.height(200.dp),
-                contentScale = ContentScale.Fit,
-            )
-        }
+        state.snapshot?.let { Snapshot(it, state.detections) }
     }
 
     editing?.let { slot ->
@@ -161,6 +163,41 @@ fun PokerScreen(
             },
             onDismiss = { editing = null },
         )
+    }
+}
+
+/** The last camera frame with a box and label on every card corner the model recognised. */
+@Composable
+private fun Snapshot(image: ImageBitmap, detections: List<CardModel.Detection>) {
+    val textMeasurer = rememberTextMeasurer()
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text("מה המודל זיהה בצילום האחרון:", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Box(
+            Modifier
+                .height(280.dp)
+                .aspectRatio(image.width.toFloat() / image.height),
+        ) {
+            Image(bitmap = image, contentDescription = "הצילום האחרון", modifier = Modifier.fillMaxSize())
+            Canvas(Modifier.fillMaxSize()) {
+                val sx = size.width / image.width
+                val sy = size.height / image.height
+                for (d in detections) {
+                    val topLeft = Offset(d.left * sx, d.top * sy)
+                    drawRect(
+                        color = Color.Yellow,
+                        topLeft = topLeft,
+                        size = Size((d.right - d.left) * sx, (d.bottom - d.top) * sy),
+                        style = Stroke(width = 3f),
+                    )
+                    drawText(
+                        textMeasurer = textMeasurer,
+                        text = "${Cards.label(d.card)} ${(d.confidence * 100).toInt()}%",
+                        topLeft = Offset(topLeft.x, (topLeft.y - 22f).coerceAtLeast(0f)),
+                        style = TextStyle(color = Color.Yellow, fontSize = 13.sp, background = Color.Black.copy(alpha = 0.6f)),
+                    )
+                }
+            }
+        }
     }
 }
 
