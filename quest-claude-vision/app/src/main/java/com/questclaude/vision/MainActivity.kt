@@ -39,6 +39,7 @@ class MainActivity : ComponentActivity() {
                         PokerScreen(
                             state = vm.poker,
                             onAutoModeChange = vm::setAutoMode,
+                            onZoomChange = vm::setZoom,
                             onScan = vm::scanCards,
                             onSetCard = vm::setCard,
                             onChangeOpponents = vm::changeOpponents,

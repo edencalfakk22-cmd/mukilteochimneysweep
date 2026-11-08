@@ -70,6 +70,7 @@ private fun pct(value: Double) = String.format(Locale.US, "%.1f%%", value * 100)
 fun PokerScreen(
     state: PokerState,
     onAutoModeChange: (Boolean) -> Unit,
+    onZoomChange: (Boolean) -> Unit,
     onScan: (ScanTarget) -> Unit,
     onSetCard: (CardSlot, Int?) -> Unit,
     onChangeOpponents: (Int) -> Unit,
@@ -92,6 +93,14 @@ fun PokerScreen(
             Switch(checked = state.autoMode, onCheckedChange = onAutoModeChange)
             Text("זיהוי אוטומטי", fontSize = 20.sp, fontWeight = FontWeight.Bold)
             Text(autoStatus(state), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 18.sp)
+        }
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Switch(checked = state.zoom, onCheckedChange = onZoomChange)
+            Text("זום למרכז (לקלפים רחוקים)", fontSize = 18.sp)
+            state.detectMs?.let {
+                Spacer(Modifier.width(24.dp))
+                Text("זמן זיהוי: $it ms לתמונה", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
         }
 
         CardRow(
@@ -164,6 +173,7 @@ fun PokerScreen(
                 image = it,
                 detections = state.detections,
                 title = if (state.autoMode) "מה המודל רואה עכשיו:" else "מה המודל זיהה בצילום האחרון:",
+                zoom = state.zoom,
             )
         }
     }
@@ -196,7 +206,7 @@ private fun autoStatus(state: PokerState): String {
 
 /** The last camera frame with a box and label on every card corner the model recognised. */
 @Composable
-private fun Snapshot(image: ImageBitmap, detections: List<CardModel.Detection>, title: String) {
+private fun Snapshot(image: ImageBitmap, detections: List<CardModel.Detection>, title: String, zoom: Boolean) {
     val textMeasurer = rememberTextMeasurer()
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(title, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -209,6 +219,15 @@ private fun Snapshot(image: ImageBitmap, detections: List<CardModel.Detection>, 
             Canvas(Modifier.fillMaxSize()) {
                 val sx = size.width / image.width
                 val sy = size.height / image.height
+                if (zoom) {
+                    // The area the model examines when zoom is on: the central half of the frame.
+                    drawRect(
+                        color = Color.White.copy(alpha = 0.7f),
+                        topLeft = Offset(size.width / 4, size.height / 4),
+                        size = Size(size.width / 2, size.height / 2),
+                        style = Stroke(width = 2f),
+                    )
+                }
                 for (d in detections) {
                     val topLeft = Offset(d.left * sx, d.top * sy)
                     drawRect(

@@ -3,6 +3,8 @@ package com.questclaude.vision
 import android.app.Application
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.os.SystemClock
+import android.util.Log
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -12,6 +14,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.questclaude.vision.poker.AutoAssign
 import com.questclaude.vision.poker.CardModel
+import com.questclaude.vision.poker.Cards
 import com.questclaude.vision.poker.EquityCalculator
 import com.questclaude.vision.poker.EquityResult
 import com.questclaude.vision.poker.HandCategory
@@ -38,6 +41,10 @@ data class PokerState(
     val cameraReady: Boolean = false,
     /** Scan continuously and fill in cards without pressing anything. */
     val autoMode: Boolean = true,
+    /** Look only at the centre of the view, at full resolution, for cards further away. */
+    val zoom: Boolean = false,
+    /** How long the last frame took to analyse, in milliseconds. */
+    val detectMs: Long? = null,
     val hole: List<Int?> = List(2) { null },
     val board: List<Int?> = List(5) { null },
     val opponents: Int = 1,
@@ -169,10 +176,17 @@ class VisionViewModel(app: Application) : AndroidViewModel(app) {
 
     private suspend fun captureAndDetect(model: CardDetector): Pair<Bitmap, List<CardModel.Detection>> {
         val jpeg = camera.captureJpeg()
+        val zoom = poker.zoom
         return withContext(Dispatchers.Default) {
             val frame = BitmapFactory.decodeByteArray(jpeg, 0, jpeg.size)
                 ?: throw IllegalStateException("לא הצלחתי לפענח את התמונה מהמצלמה")
-            frame to model.detect(frame)
+            val start = SystemClock.elapsedRealtime()
+            val detections = model.detect(frame, zoom)
+            val ms = SystemClock.elapsedRealtime() - start
+            Log.d(TAG, "${frame.width}x${frame.height} zoom=$zoom ${ms}ms: " +
+                detections.joinToString { "${Cards.code(it.card)}@${"%.2f".format(it.confidence)}" })
+            withContext(Dispatchers.Main) { poker = poker.copy(detectMs = ms) }
+            frame to detections
         }
     }
 
@@ -181,6 +195,11 @@ class VisionViewModel(app: Application) : AndroidViewModel(app) {
     fun setAutoMode(enabled: Boolean) {
         poker = poker.copy(autoMode = enabled, error = null, note = null)
         if (enabled) startAutoLoop() else stopAutoLoop()
+    }
+
+    fun setZoom(enabled: Boolean) {
+        poker = poker.copy(zoom = enabled)
+        recentFrames.clear() // Frames from the other view would not agree with the new ones.
     }
 
     /**
@@ -233,10 +252,7 @@ class VisionViewModel(app: Application) : AndroidViewModel(app) {
             ignoredCards.clear()
             recentFrames.clear()
             calculation?.cancel()
-            poker = PokerState(
-                cameraReady = poker.cameraReady,
-                autoMode = poker.autoMode,
-                opponents = poker.opponents,
+            poker = freshHand().copy(
                 snapshot = poker.snapshot,
                 detections = poker.detections,
                 hole = update.hole,
@@ -309,8 +325,17 @@ class VisionViewModel(app: Application) : AndroidViewModel(app) {
         calculation?.cancel()
         ignoredCards.clear()
         recentFrames.clear()
-        poker = PokerState(cameraReady = poker.cameraReady, autoMode = poker.autoMode, opponents = poker.opponents)
+        poker = freshHand()
     }
+
+    /** An empty table that keeps the camera state and the user's settings. */
+    private fun freshHand() = PokerState(
+        cameraReady = poker.cameraReady,
+        autoMode = poker.autoMode,
+        zoom = poker.zoom,
+        detectMs = poker.detectMs,
+        opponents = poker.opponents,
+    )
 
     // ---- Odds ----
 
@@ -339,6 +364,9 @@ class VisionViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private companion object {
+        /** Filter `adb logcat -s PokerAssistant` to see every frame's detections. */
+        const val TAG = "PokerAssistant"
+
         // Button scans: 3 frames, a card must appear in 2.
         const val SCAN_FRAMES = 3
         const val MIN_FRAMES = 2

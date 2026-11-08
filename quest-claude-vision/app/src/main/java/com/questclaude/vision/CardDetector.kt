@@ -27,18 +27,31 @@ class CardDetector(context: Context) : AutoCloseable {
         classToCard = CardModel.parseClassNames(names)
     }
 
-    /** Blocking (a few hundred ms) - call from a background thread. */
-    fun detect(frame: Bitmap): List<CardModel.Detection> {
-        val pixels = IntArray(frame.width * frame.height)
-        frame.getPixels(pixels, 0, frame.width, 0, 0, frame.width, frame.height)
-        val input = CardModel.preprocess(pixels, frame.width, frame.height)
+    /**
+     * Finds card corners in [frame]. With [zoom], only the central half of the frame (in each
+     * direction) is examined, at full resolution: distant cards look twice as big to the model.
+     * Boxes are always returned in [frame] coordinates. Blocking (a few hundred ms) - call from
+     * a background thread.
+     */
+    fun detect(frame: Bitmap, zoom: Boolean = false): List<CardModel.Detection> {
+        val cropX = if (zoom) frame.width / 4 else 0
+        val cropY = if (zoom) frame.height / 4 else 0
+        val width = frame.width - 2 * cropX
+        val height = frame.height - 2 * cropY
+        val pixels = IntArray(width * height)
+        frame.getPixels(pixels, 0, width, cropX, cropY, width, height)
+        val input = CardModel.preprocess(pixels, width, height)
         val shape = longArrayOf(1, 3, CardModel.INPUT_SIZE.toLong(), CardModel.INPUT_SIZE.toLong())
-        OnnxTensor.createTensor(env, FloatBuffer.wrap(input.chw), shape).use { tensor ->
+        val detections = OnnxTensor.createTensor(env, FloatBuffer.wrap(input.chw), shape).use { tensor ->
             session.run(mapOf(session.inputNames.first() to tensor)).use { result ->
                 val buffer = (result.get(0) as OnnxTensor).floatBuffer
                 val output = FloatArray(buffer.remaining()).also { buffer.get(it) }
-                return CardModel.decode(output, classToCard, input)
+                CardModel.decode(output, classToCard, input)
             }
+        }
+        if (cropX == 0 && cropY == 0) return detections
+        return detections.map {
+            it.copy(left = it.left + cropX, top = it.top + cropY, right = it.right + cropX, bottom = it.bottom + cropY)
         }
     }
 

@@ -38,7 +38,17 @@
 | כבל | USB-C שמעביר נתונים (הכבל שהגיע עם ה-Quest מתאים) |
 | אינטרנט | **רק במחשב, ורק בבנייה הראשונה**, כדי להוריד את מודל זיהוי הקלפים (45MB). המשקפיים לא צריכות אינטרנט |
 
-## התקנה (פעם אחת)
+## התקנה מהירה, בלי Android Studio
+
+אם יש לך קובץ APK מוכן, למשל `poker-assistant-v0.4.apk`:
+
+1. מפעילים **מצב מפתחים** ב-Quest (סעיף 1 למטה).
+2. מתקינים במחשב את [Meta Quest Developer Hub](https://developers.meta.com/horizon/documentation/android-apps/meta-quest-developer-hub/) (Windows או Mac).
+3. מחברים את ה-Quest בכבל, שמים את המשקפיים ומאשרים **"Allow USB debugging"**.
+4. ב-Developer Hub, בעמוד המכשיר, **גוררים את קובץ ה-APK** לאזור האפליקציות. אפשר גם להשתמש ב-SideQuest, או מהטרמינל: `adb install -r poker-assistant-v0.4.apk`.
+5. במשקפיים: ספרייה ← **Unknown Sources** ← "עוזר פוקר".
+
+## התקנה מהקוד (פעם אחת)
 
 ### 1. הפעלת מצב מפתחים ב-Quest
 1. נכנסים ל-[developers.meta.com](https://developers.meta.com/horizon/) עם חשבון ה-Meta שלך ויוצרים "Organization" (בחינם). בלי זה מצב מפתחים לא נפתח.
