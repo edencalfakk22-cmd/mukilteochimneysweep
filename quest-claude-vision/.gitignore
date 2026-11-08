@@ -1,0 +1,10 @@
+# local.properties holds the SDK path and your ANTHROPIC_API_KEY - never commit it
+local.properties
+.gradle/
+.kotlin/
+build/
+app/build/
+.idea/
+*.iml
+captures/
+.DS_Store
