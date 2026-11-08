@@ -43,6 +43,7 @@ class MainActivity : ComponentActivity() {
                             onScan = vm::scanCards,
                             onSetCard = vm::setCard,
                             onChangeOpponents = vm::changeOpponents,
+                            onOpponentStyleChange = vm::setOpponentStyle,
                             onPotChange = vm::onPotChange,
                             onToCallChange = vm::onToCallChange,
                             onNewHand = vm::newHand,

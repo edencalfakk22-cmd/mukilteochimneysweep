@@ -19,6 +19,7 @@ import com.questclaude.vision.poker.EquityCalculator
 import com.questclaude.vision.poker.EquityResult
 import com.questclaude.vision.poker.HandCategory
 import com.questclaude.vision.poker.HandEvaluator
+import com.questclaude.vision.poker.OpponentStyle
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
@@ -48,6 +49,7 @@ data class PokerState(
     val hole: List<Int?> = List(2) { null },
     val board: List<Int?> = List(5) { null },
     val opponents: Int = 1,
+    val opponentStyle: OpponentStyle = OpponentStyle.ANY,
     val pot: String = "",
     val toCall: String = "",
     val scanning: ScanTarget? = null,
@@ -313,6 +315,12 @@ class VisionViewModel(app: Application) : AndroidViewModel(app) {
         recalculate()
     }
 
+    fun setOpponentStyle(style: OpponentStyle) {
+        if (style == poker.opponentStyle) return
+        poker = poker.copy(opponentStyle = style)
+        recalculate()
+    }
+
     fun onPotChange(text: String) {
         poker = poker.copy(pot = text.filter { it.isDigit() || it == '.' })
     }
@@ -335,6 +343,7 @@ class VisionViewModel(app: Application) : AndroidViewModel(app) {
         zoom = poker.zoom,
         detectMs = poker.detectMs,
         opponents = poker.opponents,
+        opponentStyle = poker.opponentStyle,
     )
 
     // ---- Odds ----
@@ -349,10 +358,11 @@ class VisionViewModel(app: Application) : AndroidViewModel(app) {
         }
         val board = poker.board.filterNotNull()
         val opponents = poker.opponents
+        val style = poker.opponentStyle
         poker = poker.copy(calculating = true)
         calculation = viewModelScope.launch {
             val result = withContext(Dispatchers.Default) {
-                EquityCalculator.calculate(hole, board, opponents)
+                EquityCalculator.calculate(hole, board, opponents, opponentRange = style.range)
             }
             poker = poker.copy(result = result, calculating = false)
         }

@@ -16,31 +16,64 @@ class EquityResult(
 )
 
 /**
- * Monte Carlo equity for Texas Hold'em against [opponents] random hands: deals the unknown
- * cards many times and counts how often your hand wins or ties. With 40,000 runs the result is
- * within about half a percentage point of the exact value.
+ * Monte Carlo equity for Texas Hold'em: deals the unknown cards many times and counts how often
+ * your hand wins or ties. With 40,000 runs the result is within about half a percentage point of
+ * the exact value.
  */
 object EquityCalculator {
 
+    /** Give up on a range after this many clashes with cards already dealt to other opponents. */
+    private const val MAX_RANGE_ATTEMPTS = 200
+
+    /**
+     * @param opponentRange which two-card hands opponents may hold, as built by
+     *   [StartingHands.topRange]; null means any hand (random opponents).
+     */
     fun calculate(
         hole: List<Int>,
         board: List<Int>,
         opponents: Int,
         iterations: Int = 40_000,
         random: Random = Random.Default,
+        opponentRange: BooleanArray? = null,
     ): EquityResult {
         require(hole.size == 2) { "Need exactly 2 hole cards" }
         require(board.size <= 5) { "The board has at most 5 cards" }
         require(opponents in 1..9) { "Opponents must be between 1 and 9" }
+        require(opponentRange == null || opponentRange.size == 52 * 52) { "Range must be a 52x52 table" }
         val known = hole + board
         require(known.all { it in 0 until 52 } && known.toSet().size == known.size) { "Duplicate or invalid card" }
 
         val deck = (0 until 52).filterNot { it in known }.toIntArray()
+        val position = IntArray(52) { -1 }
+        deck.forEachIndexed { i, card -> position[card] = i }
+        fun swap(i: Int, j: Int) {
+            val a = deck[i]
+            val b = deck[j]
+            deck[i] = b
+            deck[j] = a
+            position[b] = i
+            position[a] = j
+        }
+        /** Partial Fisher-Yates step: moves a random card from the undealt pool into slot [i]. */
+        fun drawInto(i: Int) = swap(i, i + random.nextInt(deck.size - i))
+
+        // Hands the range allows that don't use a card you can see, encoded low * 52 + high.
+        // Picking straight from this list stays fast even for a range of a single hand.
+        val rangeCombos: IntArray? = opponentRange?.let { range ->
+            val combos = ArrayList<Int>()
+            for (a in 0 until 52) {
+                for (b in a + 1 until 52) {
+                    if (range[a * 52 + b] && position[a] >= 0 && position[b] >= 0) combos += a * 52 + b
+                }
+            }
+            combos.toIntArray()
+        }?.takeIf { it.isNotEmpty() }
         val boardMissing = 5 - board.size
-        val cardsToDeal = boardMissing + 2 * opponents
 
         val fullBoard = IntArray(5)
         board.forEachIndexed { i, card -> fullBoard[i] = card }
+        val opponentCards = IntArray(2 * opponents)
         val hero = IntArray(7)
         hero[0] = hole[0]
         hero[1] = hole[1]
@@ -52,14 +85,38 @@ object EquityCalculator {
         val categoryCounts = IntArray(HandCategory.COUNT)
 
         repeat(iterations) {
-            // Partial Fisher-Yates: the first [cardsToDeal] deck slots become a fresh random deal.
-            for (i in 0 until cardsToDeal) {
-                val j = i + random.nextInt(deck.size - i)
-                val tmp = deck[i]
-                deck[i] = deck[j]
-                deck[j] = tmp
+            // Deck slots before `next` are dealt this run; the rest is the undealt pool.
+            var next = 0
+
+            // Opponents first, so their hands depend only on the cards you can see. Dealing the
+            // board first and then filtering hands by range would skew which boards come up.
+            for (o in 0 until opponents) {
+                var combo = -1
+                if (rangeCombos != null) {
+                    // Pick a hand from the range whose cards are still undealt this run.
+                    var attempts = 0
+                    while (combo < 0 && attempts++ < MAX_RANGE_ATTEMPTS) {
+                        val candidate = rangeCombos[random.nextInt(rangeCombos.size)]
+                        if (position[candidate / 52] >= next && position[candidate % 52] >= next) combo = candidate
+                    }
+                }
+                if (combo >= 0) {
+                    swap(next, position[combo / 52])
+                    swap(next + 1, position[combo % 52])
+                } else {
+                    // No range, or every hand in it is already taken: deal any two cards.
+                    drawInto(next)
+                    drawInto(next + 1)
+                }
+                opponentCards[2 * o] = deck[next]
+                opponentCards[2 * o + 1] = deck[next + 1]
+                next += 2
             }
-            for (i in 0 until boardMissing) fullBoard[board.size + i] = deck[i]
+            for (i in 0 until boardMissing) {
+                drawInto(next)
+                fullBoard[board.size + i] = deck[next]
+                next++
+            }
             for (i in 0 until 5) {
                 hero[2 + i] = fullBoard[i]
                 villain[2 + i] = fullBoard[i]
@@ -71,8 +128,8 @@ object EquityCalculator {
             var lost = false
             var tiedWith = 0
             for (o in 0 until opponents) {
-                villain[0] = deck[boardMissing + 2 * o]
-                villain[1] = deck[boardMissing + 2 * o + 1]
+                villain[0] = opponentCards[2 * o]
+                villain[1] = opponentCards[2 * o + 1]
                 val score = HandEvaluator.evaluate(villain)
                 if (score > heroScore) {
                     lost = true

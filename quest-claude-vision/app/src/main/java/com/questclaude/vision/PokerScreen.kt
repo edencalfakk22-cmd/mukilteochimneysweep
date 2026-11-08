@@ -30,6 +30,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -58,6 +59,7 @@ import androidx.compose.ui.window.DialogProperties
 import com.questclaude.vision.poker.Cards
 import com.questclaude.vision.poker.EquityResult
 import com.questclaude.vision.poker.HandCategory
+import com.questclaude.vision.poker.OpponentStyle
 import java.util.Locale
 
 private val CardRed = Color(0xFFD32F2F)
@@ -74,6 +76,7 @@ fun PokerScreen(
     onScan: (ScanTarget) -> Unit,
     onSetCard: (CardSlot, Int?) -> Unit,
     onChangeOpponents: (Int) -> Unit,
+    onOpponentStyleChange: (OpponentStyle) -> Unit,
     onPotChange: (String) -> Unit,
     onToCallChange: (String) -> Unit,
     onNewHand: () -> Unit,
@@ -152,6 +155,17 @@ fun PokerScreen(
             )
             Spacer(Modifier.width(24.dp))
             FilledTonalButton(onClick = onNewHand) { Text("יד חדשה", fontSize = 18.sp) }
+        }
+
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("סוג היריבים", fontSize = 18.sp)
+            OpponentStyle.entries.forEach { style ->
+                FilterChip(
+                    selected = state.opponentStyle == style,
+                    onClick = { onOpponentStyleChange(style) },
+                    label = { Text(style.label, fontSize = 16.sp) },
+                )
+            }
         }
 
         state.error?.let { Text(it, color = MaterialTheme.colorScheme.error, fontSize = 18.sp) }
@@ -320,9 +334,9 @@ private fun Results(state: PokerState, result: EquityResult) {
                 }
             }
             Text(
-                "ניצחון ${pct(result.win)} · תיקו ${pct(result.tie)} · מול ${result.opponents} " +
-                    (if (result.opponents == 1) "יד אקראית" else "ידיים אקראיות") +
-                    " (${"%,d".format(result.iterations)} סימולציות)",
+                "ניצחון ${pct(result.win)} · תיקו ${pct(result.tie)} · " +
+                    "מול ${result.opponents} ${if (result.opponents == 1) "יריב" else "יריבים"} " +
+                    "(${state.opponentStyle.description}) · ${"%,d".format(result.iterations)} סימולציות",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
@@ -359,7 +373,11 @@ private fun Results(state: PokerState, result: EquityResult) {
             }
 
             Text(
-                "החישוב מניח שליריבים יש ידיים אקראיות. אם יריב מהמר חזק, כנראה שהיד שלו טובה מהממוצע והסיכוי שלך נמוך יותר.",
+                if (state.opponentStyle == OpponentStyle.ANY) {
+                    "החישוב מניח שליריבים יש ידיים אקראיות. אם מישהו מהמר חזק, בחר \"הדוק\" או \"מהמר חזק\" למעלה."
+                } else {
+                    "החישוב מניח שהיריבים מחזיקים רק ידיים מתוך ${state.opponentStyle.description}, לפי דירוג ידיי פתיחה."
+                },
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 14.sp,
             )
